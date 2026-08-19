@@ -152,18 +152,26 @@ assets: vendor pyodide typst
 DEPLOY_HOST    ?= vps
 DEPLOY_DIR     ?= /srv/neuroscribe
 DEPLOY_SERVICE ?= neuroscribe
+# One SSH connection for the whole deploy: the first command opens a control
+# socket (one passphrase prompt), and every rsync and ssh after it rides the
+# same connection. The master lingers two minutes, so a quick redeploy is free.
+DEPLOY_SSH := ssh -o ControlMaster=auto -o ControlPath=/tmp/ng-deploy-%r@%h -o ControlPersist=120
 deploy: release
-	rsync -azv dist/$(BINARY)-$(RELEASE_GOOS)-$(RELEASE_GOARCH) \
+	rsync -azv -e "$(DEPLOY_SSH)" dist/$(BINARY)-$(RELEASE_GOOS)-$(RELEASE_GOARCH) \
 		$(DEPLOY_HOST):$(DEPLOY_DIR)/$(BINARY)
 	@for dir in pyodide typst; do \
 		if [ -d $$dir ]; then \
-			rsync -azv --delete $$dir $(DEPLOY_HOST):$(DEPLOY_DIR)/; \
+			rsync -azv --delete -e "$(DEPLOY_SSH)" $$dir $(DEPLOY_HOST):$(DEPLOY_DIR)/; \
 		fi; \
 	done
-	ssh $(DEPLOY_HOST) 'chown -R neuroscribe:neuroscribe $(DEPLOY_DIR) \
+	$(DEPLOY_SSH) $(DEPLOY_HOST) 'chown -R neuroscribe:neuroscribe $(DEPLOY_DIR) \
 		&& chmod 700 $(DEPLOY_DIR) && chmod +x $(DEPLOY_DIR)/$(BINARY) \
 		&& systemctl restart $(DEPLOY_SERVICE) \
-		&& sleep 1 && $(DEPLOY_DIR)/$(BINARY) healthcheck'
+		&& for i in 1 2 3 4 5 6 7 8 9 10; do \
+			$(DEPLOY_DIR)/$(BINARY) healthcheck && exit 0; sleep 1; \
+		done; \
+		echo "--- service did not become healthy; recent log: ---"; \
+		journalctl -u $(DEPLOY_SERVICE) -n 25 --no-pager; exit 1'
 	@echo "deployed and healthy"
 
 # Local mail catcher: SMTP on 1025, inbox at http://localhost:8025

@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -33,10 +34,16 @@ func main() {
 			target = "127.0.0.1:" + strings.TrimPrefix(target, "0.0.0.0:")
 		}
 		resp, err := (&http.Client{Timeout: 5 * time.Second}).Get("http://" + target + "/healthz")
-		if err != nil || resp.StatusCode != http.StatusOK {
+		if err != nil {
 			log.Fatalf("unhealthy: %v", err)
 		}
-		resp.Body.Close()
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			// the status and body are the diagnosis; swallowing them turns a
+			// clear answer ("503 database unavailable") into a mystery
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+			log.Fatalf("unhealthy: HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		}
 		return
 	}
 	// `neuroscribe mail test you@example.com` proves out SMTP settings
