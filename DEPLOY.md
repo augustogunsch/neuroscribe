@@ -111,9 +111,22 @@ curl -s http://127.0.0.1:8484/healthz    # → ok
 
 ## 4. nginx and TLS
 
-The site config references the certificate, and certbot needs nginx serving
-its challenge to issue one — so the first certificate goes through a
-bootstrap config that serves only the challenge:
+**Already running nginx with other certificates?** Skip the bootstrap: the
+nginx authenticator answers the challenge through your live server without
+touching your other sites —
+
+```sh
+sudo certbot certonly --nginx -d <your domain>
+```
+
+— then jump to installing the site config below. (If your other sites renew
+through a shared webroot instead, reuse it: pass your `-w` path to certbot
+and change the `root` under `/.well-known/acme-challenge/` in the site config
+to match, so renewals keep working.)
+
+**On a fresh box** the site config references the certificate, and certbot
+needs nginx serving its challenge to issue one — so the first certificate
+goes through a bootstrap config that serves only the challenge:
 
 ```sh
 sudo mkdir -p /var/www/certbot
@@ -134,11 +147,13 @@ sudo nginx -t && sudo systemctl reload nginx
 ```
 
 Renewals need no bootstrap: the real config keeps the challenge path served
-over plain HTTP, and `certbot renew` reuses the webroot. The supplied config
-already carries the pieces that matter: `Host` and
+over plain HTTP, and `certbot renew` reuses whichever method issued the
+certificate. The supplied config already carries the pieces that matter: `Host` and
 `X-Forwarded-Proto` forwarded (host allowlisting and Secure cookies depend on
 them), rate limits on sign-in and sign-up, `sw.js` never cached, sync bodies
-kept off nginx's disk.
+kept off nginx's disk. It coexists with other sites on the same nginx: it
+claims only its own `server_name`, and its rate-limit zones carry the `ng_`
+prefix so they cannot collide with zones your other configs define.
 
 ## 5. First account, and checks
 
