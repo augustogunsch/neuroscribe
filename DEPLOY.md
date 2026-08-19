@@ -46,6 +46,10 @@ sudo mkdir -p /srv/neuroscribe
 sudo cp neuroscribe /srv/neuroscribe/
 sudo cp -r pyodide typst /srv/neuroscribe/   # if you ran `make assets`
 sudo chown -R neuroscribe:neuroscribe /srv/neuroscribe
+sudo chmod 700 /srv/neuroscribe          # directories need x to be entered:
+                                         # a recursive 600 here breaks the
+                                         # service with status=200/CHDIR
+sudo chmod 600 /srv/neuroscribe/.env
 ```
 
 Create `/srv/neuroscribe/.env` (owner `neuroscribe`, mode `0600`):
@@ -105,6 +109,13 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now neuroscribe
 curl -s http://127.0.0.1:8484/healthz    # → ok
 ```
+
+If it fails, `journalctl -u neuroscribe -n 30` says why. Two systemd codes
+worth decoding: `status=200/CHDIR` means `/srv/neuroscribe` is missing or
+lacks the execute bit (directories need `x` to be entered — `chmod 700` it);
+`Failed to load environment files` means `.env` does not exist. After five
+fast failures systemd latches `start-limit-hit` and refuses further starts:
+`systemctl reset-failed neuroscribe` clears it before the next restart.
 
 (Prefer containers? `compose.yaml` in the repo is the hardened equivalent:
 `docker compose up -d --build`.)
