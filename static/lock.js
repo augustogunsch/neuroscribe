@@ -301,6 +301,11 @@ function ngLockScreen() {
 	input.maxLength = NG_PIN_LENGTH;
 	input.className = "pin-input";
 	input.setAttribute("aria-label", ngT("PIN"));
+	// six digits is the whole input: submitting on the sixth saves the reach
+	// for a button the reader can already see is redundant
+	input.addEventListener("input", function () {
+		if (/^[0-9]{6}$/.test(input.value)) form.requestSubmit();
+	});
 	const submit = document.createElement("button");
 	submit.type = "submit";
 	submit.className = "primary";
