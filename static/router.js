@@ -350,6 +350,7 @@ function ngWireGlobalActions() {
 		const link = e.target.closest("a[data-link]");
 		if (link && link.getAttribute("href") && !e.metaKey && !e.ctrlKey && e.button === 0) {
 			e.preventDefault();
+			document.body.classList.remove("mobile-nav-open");
 			ngNavigate(link.getAttribute("href"));
 			return;
 		}
@@ -366,7 +367,8 @@ function ngWireGlobalActions() {
 				toggleSidebar();
 				break;
 			case "toggle-mobile-nav":
-				document.body.classList.toggle("nav-open");
+				// the class the stylesheet's mobile rules are written against
+				document.body.classList.toggle("mobile-nav-open");
 				break;
 		}
 	});

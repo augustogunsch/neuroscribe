@@ -168,7 +168,9 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// for style only: KaTeX sets inline styles on the spans it renders.
 	h.Set("Content-Security-Policy",
 		"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "+
-			"font-src 'self'; img-src 'self' data:; connect-src 'self'; "+
+			// blob: because decrypted images exist only as object URLs this
+			// page mints itself — nothing remote gets in through it
+			"font-src 'self'; img-src 'self' data: blob:; connect-src 'self'; "+
 			// the Altcha widget solves its proof of work in blob workers
 			"worker-src 'self' blob:; "+
 			// the snippet runner, framed from this origin and sandboxed

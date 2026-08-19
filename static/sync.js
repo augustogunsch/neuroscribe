@@ -76,8 +76,10 @@ async function ngSync() {
 	ngSyncing = true;
 	ngAnnounceSync();
 	try {
-		await ngPushBlobs();
+		// Records before blobs: the server refuses image bytes until the image
+		// record exists, so this order is load-bearing, not stylistic.
 		await ngPush();
+		await ngPushBlobs();
 		await ngPull();
 		ngLastError = "";
 	} catch (err) {
@@ -196,6 +198,14 @@ async function ngPushBlobs() {
 			headers: { "Content-Type": "application/octet-stream", "X-CSRF-Token": csrfToken() },
 			body: blob.data,
 		});
+		if (resp.status === 404) {
+			// The server has no image record for these bytes — the record was
+			// refused (a quota) or deleted while the blob waited. Retrying can
+			// never succeed, and one orphan must not wedge every future sync.
+			await ngPutBlob(blob.ref, blob.data, false);
+			ngLastError = "an image could not be uploaded: " + (await resp.text()).trim();
+			continue;
+		}
 		if (!resp.ok) throw new Error("image upload failed: " + resp.status);
 		await ngPutBlob(blob.ref, blob.data, false);
 	}
