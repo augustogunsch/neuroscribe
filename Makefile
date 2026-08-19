@@ -153,11 +153,11 @@ DEPLOY_HOST    ?= vps
 DEPLOY_DIR     ?= /srv/neuroscribe
 DEPLOY_SERVICE ?= neuroscribe
 deploy: release
-	rsync -az --info=NAME dist/$(BINARY)-$(RELEASE_GOOS)-$(RELEASE_GOARCH) \
+	rsync -azv dist/$(BINARY)-$(RELEASE_GOOS)-$(RELEASE_GOARCH) \
 		$(DEPLOY_HOST):$(DEPLOY_DIR)/$(BINARY)
 	@for dir in pyodide typst; do \
 		if [ -d $$dir ]; then \
-			rsync -az --delete --info=NAME1 $$dir $(DEPLOY_HOST):$(DEPLOY_DIR)/; \
+			rsync -azv --delete $$dir $(DEPLOY_HOST):$(DEPLOY_DIR)/; \
 		fi; \
 	done
 	ssh $(DEPLOY_HOST) 'chown -R neuroscribe:neuroscribe $(DEPLOY_DIR) \
