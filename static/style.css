@@ -1097,7 +1097,17 @@ body.is-locked { overflow: hidden; }
 	text-align: center;
 }
 .lock-box h1 { margin: 0.75rem 0 0.25rem; font-size: 1.4rem; }
-.lock-brand { justify-content: center; margin-bottom: 0.5rem; }
+/* Unlike the sidebar brand, this one has no anchor inside — the flex rule
+   that lines the logo up with the name has to live on the element itself. */
+.lock-brand {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	margin-bottom: 0.5rem;
+	font-size: 1.15rem;
+	font-weight: 700;
+}
 .lock-form {
 	display: flex;
 	flex-direction: column;
