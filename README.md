@@ -94,9 +94,11 @@ are deleted after 7 days, and each sign-up must solve an
 third-party requests). Registration is rate limited to 5 attempts per hour per
 IP address.
 
-> **Before opening sign-ups:** notes are not yet partitioned per user, so every
-> account shares one workspace. Leave `NEUROSCRIBE_REGISTRATION` unset until
-> per-user isolation lands.
+> **Multi-account:** every record and image is scoped to its owner (`user_id`
+> on `records`/`blobs`, and every query runs through an account-bound store), so
+> accounts are isolated — one cannot read, sync, or overwrite another's data.
+> Opening `NEUROSCRIBE_REGISTRATION=open` is therefore safe on this axis; it is
+> still gated by email verification, an Altcha proof-of-work, and rate limiting.
 
 > **There is no CLI fallback for creating accounts.** If mail breaks while no
 > account exists, fix mail (`neuroscribe mail test …`) — nothing else can mint

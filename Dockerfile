@@ -9,7 +9,11 @@
 # flags that go with it.
 
 # ---- build ----------------------------------------------------------------
-FROM golang:1.26.6-bookworm AS build
+# Pinned by digest, not just tag: a tag is repointable, and the browser assets
+# are already SHA-pinned, so the compiler should be too. Digest = golang
+# 1.26.6-bookworm; bump tag and digest together (docker buildx imagetools
+# inspect golang:<tag> prints the new digest).
+FROM golang:1.26.6-bookworm@sha256:116d58cbd88c1297624acc6e967a060012422bacf9930927e23fb719189c6f36 AS build
 WORKDIR /src
 
 # dependencies first, so code edits do not re-download the module cache
@@ -25,7 +29,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 	CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/neuroscribe .
 
 # ---- runtime --------------------------------------------------------------
-FROM debian:bookworm-slim AS runtime
+# Digest = debian:bookworm-slim; bump tag and digest together.
+FROM debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241 AS runtime
 
 # Nothing here executes user code or reads a note. Python and JavaScript
 # snippets run in the browser, and so does typesetting: the ~1.3 GB TeX Live

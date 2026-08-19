@@ -155,7 +155,9 @@ DEPLOY_SERVICE ?= neuroscribe
 # One SSH connection for the whole deploy: the first command opens a control
 # socket (one passphrase prompt), and every rsync and ssh after it rides the
 # same connection. The master lingers two minutes, so a quick redeploy is free.
-DEPLOY_SSH := ssh -o ControlMaster=auto -o ControlPath=/tmp/ng-deploy-%r@%h -o ControlPersist=120
+# The socket lives under ~/.ssh (0700) with a hashed name (%C), not in
+# world-writable /tmp where its predictable path invites squatting or hijack.
+DEPLOY_SSH := ssh -o ControlMaster=auto -o ControlPath=~/.ssh/ng-deploy-%C -o ControlPersist=120
 deploy: release
 	rsync -azv -e "$(DEPLOY_SSH)" dist/$(BINARY)-$(RELEASE_GOOS)-$(RELEASE_GOARCH) \
 		$(DEPLOY_HOST):$(DEPLOY_DIR)/$(BINARY)
@@ -164,8 +166,10 @@ deploy: release
 			rsync -azv --delete -e "$(DEPLOY_SSH)" $$dir $(DEPLOY_HOST):$(DEPLOY_DIR)/; \
 		fi; \
 	done
-	$(DEPLOY_SSH) $(DEPLOY_HOST) 'chown -R neuroscribe:neuroscribe $(DEPLOY_DIR) \
-		&& chmod 700 $(DEPLOY_DIR) && chmod +x $(DEPLOY_DIR)/$(BINARY) \
+	$(DEPLOY_SSH) $(DEPLOY_HOST) 'mkdir -p $(DEPLOY_DIR)/data \
+		&& chown -R root:neuroscribe $(DEPLOY_DIR) \
+		&& chown -R neuroscribe:neuroscribe $(DEPLOY_DIR)/data \
+		&& chmod 750 $(DEPLOY_DIR) $(DEPLOY_DIR)/$(BINARY) $(DEPLOY_DIR)/data \
 		&& systemctl restart $(DEPLOY_SERVICE) \
 		&& for i in 1 2 3 4 5 6 7 8 9 10; do \
 			$(DEPLOY_DIR)/$(BINARY) healthcheck && exit 0; sleep 1; \

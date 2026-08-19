@@ -40,23 +40,37 @@ override with `RELEASE_GOARCH=arm64` for an ARM server.
 
 ## 2. Install
 
+The service account must **not** be able to overwrite its own binary or read
+config it does not need — that is the best persistence foothold a compromised
+process could ask for. So the binary and `.env` are owned by `root` and only
+*read* by the service; the one thing the service writes, its database, lives in
+a `data/` subdirectory it owns.
+
 ```sh
 sudo useradd --system --home /srv/neuroscribe --shell /usr/sbin/nologin neuroscribe
-sudo mkdir -p /srv/neuroscribe
+sudo mkdir -p /srv/neuroscribe/data
+
+# binary + static runtimes: owned by root, readable/traversable by the service
 sudo cp neuroscribe /srv/neuroscribe/
 sudo cp -r pyodide typst /srv/neuroscribe/   # if you ran `make assets`
-sudo chown -R neuroscribe:neuroscribe /srv/neuroscribe
-sudo chmod 700 /srv/neuroscribe          # directories need x to be entered:
-                                         # a recursive 600 here breaks the
-                                         # service with status=200/CHDIR
-sudo chmod 600 /srv/neuroscribe/.env
+sudo chown -R root:neuroscribe /srv/neuroscribe
+sudo chmod 750 /srv/neuroscribe /srv/neuroscribe/neuroscribe   # dirs need x to enter
+sudo find /srv/neuroscribe/pyodide /srv/neuroscribe/typst -type d -exec chmod 755 {} + 2>/dev/null || true
+
+# the only writable place: the database directory, owned by the service
+sudo chown -R neuroscribe:neuroscribe /srv/neuroscribe/data
+sudo chmod 750 /srv/neuroscribe/data
+
+# .env holds the SMTP secret: root-owned, group-readable by the service only
+sudo install -o root -g neuroscribe -m 640 /dev/null /srv/neuroscribe/.env
+sudo -e /srv/neuroscribe/.env    # or your editor of choice; see the template below
 ```
 
-Create `/srv/neuroscribe/.env` (owner `neuroscribe`, mode `0600`):
+Fill `/srv/neuroscribe/.env` (owner `root:neuroscribe`, mode `0640`):
 
 ```sh
 NEUROSCRIBE_ADDR=127.0.0.1:8484
-NEUROSCRIBE_DB=/srv/neuroscribe/neuroscribe.db
+NEUROSCRIBE_DB=/srv/neuroscribe/data/neuroscribe.db
 NEUROSCRIBE_ALLOWED_HOSTS=notes.example.com
 NEUROSCRIBE_BASE_URL=https://notes.example.com
 NEUROSCRIBE_TRUST_PROXY=1
@@ -87,18 +101,31 @@ EnvironmentFile=/srv/neuroscribe/.env
 ExecStart=/srv/neuroscribe/neuroscribe
 Restart=on-failure
 
-# the process needs nothing but its own directory
+# the process writes only its database directory; everything else is read-only
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/srv/neuroscribe
+ReadWritePaths=/srv/neuroscribe/data
 PrivateTmp=yes
 PrivateDevices=yes
 ProtectKernelTunables=yes
+ProtectKernelModules=yes
 ProtectControlGroups=yes
 RestrictAddressFamilies=AF_INET AF_INET6
 MemoryDenyWriteExecute=yes
 CapabilityBoundingSet=
+# a pure-Go static binary tolerates the full lockdown, so take all of it
+SystemCallFilter=@system-service
+SystemCallArchitectures=native
+RestrictNamespaces=yes
+LockPersonality=yes
+ProtectHostname=yes
+ProtectClock=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target
@@ -112,7 +139,7 @@ curl -s http://127.0.0.1:8484/healthz    # → ok
 
 If it fails, `journalctl -u neuroscribe -n 30` says why. Two systemd codes
 worth decoding: `status=200/CHDIR` means `/srv/neuroscribe` is missing or
-lacks the execute bit (directories need `x` to be entered — `chmod 700` it);
+lacks the execute bit (directories need `x` to be entered — `chmod 750` it);
 `Failed to load environment files` means `.env` does not exist. After five
 fast failures systemd latches `start-limit-hit` and refuses further starts:
 `systemctl reset-failed neuroscribe` clears it before the next restart.
@@ -195,8 +222,8 @@ verification mail. Then confirm the deployment is what it claims to be:
 cd /srv/neuroscribe && make assets vendor
 
 # the database holds no plaintext: write a note, then
-sqlite3 neuroscribe.db "SELECT substr(payload,1,40) FROM records LIMIT 3;"
-# every row should read {"h":"v1.… — sealed envelopes, nothing legible
+sqlite3 data/neuroscribe.db "SELECT substr(payload,1,40) FROM records LIMIT 3;"
+# every row should read {"h":"v1.… or {"h":"v2.… — sealed envelopes, nothing legible
 ```
 
 In the browser: the address bar offers *Install*; after loading once, the app
@@ -205,8 +232,8 @@ accident.
 
 ## Upkeep
 
-- **Backups**: copy `neuroscribe.db` (plus `-wal`/`-shm`, or use
-  `sqlite3 neuroscribe.db ".backup backup.db"` for a consistent snapshot).
+- **Backups**: copy `data/neuroscribe.db` (plus `-wal`/`-shm`, or use
+  `sqlite3 data/neuroscribe.db ".backup backup.db"` for a consistent snapshot).
   The file is ciphertext except account emails; treat it as sensitive anyway.
 - **Upgrades**: build the new binary, restart the service. Asset caches
   invalidate themselves (the version is a hash of the build); browsers pick

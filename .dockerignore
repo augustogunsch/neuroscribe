@@ -3,6 +3,13 @@
 .playwright-mcp
 *.db
 *.db-*
-.env.local
+.env
+.env.*
 neuroscribe
 *.png
+# large runtimes and build output: not needed in the build context, and
+# backups/ holds account emails that must never enter a build layer or cache
+pyodide/
+typst/
+dist/
+backups/

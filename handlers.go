@@ -147,6 +147,14 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// a window this app opens can never script back into it, and vice versa
 	h.Set("Cross-Origin-Opener-Policy", "same-origin")
 
+	// DNS rebinding: a hostile page pointing its own name at this address still
+	// sends that name in Host. Checked before anything is served — including the
+	// runner document below, whose CSP is built from the request Host.
+	if !s.hostAllowed(r) {
+		http.Error(w, "unrecognized Host header", http.StatusMisdirectedRequest)
+		return
+	}
+
 	// The snippet runner is the one document meant to be framed, and the one
 	// that needs eval — on an origin of its own, with no session behind it.
 	if r.URL.Path == "/static/runner.html" {
@@ -168,13 +176,6 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// the installed app's own manifest
 			"manifest-src 'self'; "+
 			"form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
-
-	// DNS rebinding: a hostile page pointing its own name at this address
-	// still sends that name in Host.
-	if !s.hostAllowed(r) {
-		http.Error(w, "unrecognized Host header", http.StatusMisdirectedRequest)
-		return
-	}
 
 	// Sync is the only thing that carries bulk now: a batch of sealed records,
 	// or one image. Everything else is a form.

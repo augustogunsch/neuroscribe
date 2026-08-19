@@ -122,7 +122,11 @@ async function ngUnlockAttempt(password, salt, username, form) {
 		return false;
 	}
 	ngStoreDataKey(ngUnB64(dataKey));
-	window.location = data.redirect || "/";
+	// data.redirect is server-controlled; follow it only when it is a same-origin
+	// path (a single leading slash, not "//host" or a scheme), so a compromised
+	// backend cannot bounce a just-authenticated user to a phishing page.
+	const dest = data.redirect || "/";
+	window.location = (typeof dest === "string" && /^\/(?!\/)/.test(dest)) ? dest : "/";
 	return true;
 }
 

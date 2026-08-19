@@ -268,7 +268,7 @@ async function ngUploadImage(input, noteRef) {
 	if (!key) return;
 	const sealed = await ngSealBytes(key, new Uint8Array(await file.arrayBuffer()));
 	const header = { name: file.name, mime: file.type, note: noteRef };
-	const rec = await ngCreate("image", noteRef, await ngSealRecord(header));
+	const rec = await ngCreate("image", noteRef, await ngSealRecord("image", header));
 	await ngPutBlob(rec.ref, sealed, true);
 	ngModel.images.set(rec.ref, Object.assign({ ref: rec.ref, rev: 0 }, header));
 	input.value = "";

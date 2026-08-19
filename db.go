@@ -185,7 +185,11 @@ const trashRetentionDays = 60
 // stops the change log growing forever. Blobs go with them.
 func purgeTrash(db *sql.DB) {
 	cutoff := fmt.Sprintf("-%d days", trashRetentionDays)
-	db.Exec(`DELETE FROM blobs WHERE ref IN (
-		SELECT ref FROM records WHERE deleted = 1 AND updated_at < datetime('now', ?))`, cutoff)
+	// Scope the blob delete by (user_id, ref), not ref alone. A ref is only
+	// unique per account (PRIMARY KEY (user_id, ref)) and is client-chosen, so
+	// an unscoped `ref IN (...)` would let one account's tombstone delete a
+	// different account's live blob that happens to share the ref.
+	db.Exec(`DELETE FROM blobs WHERE (user_id, ref) IN (
+		SELECT user_id, ref FROM records WHERE deleted = 1 AND updated_at < datetime('now', ?))`, cutoff)
 	db.Exec("DELETE FROM records WHERE deleted = 1 AND updated_at < datetime('now', ?)", cutoff)
 }

@@ -86,8 +86,27 @@ func (s *server) originAllowed(r *http.Request) bool {
 		s.allowedHosts[strings.ToLower(host)]
 }
 
-// clientIP is for logs only — never for authorization decisions.
+// clientIP resolves the request's source address. Behind a trusted reverse
+// proxy every request arrives from 127.0.0.1, which would collapse the login
+// throttle into one global bucket (a targeted account-lockout DoS) and erase
+// the source-IP trail from the logs — so when a proxy is declared, believe the
+// address it forwarded. Only when NEUROSCRIBE_TRUST_PROXY is set, for the same
+// reason isHTTPS gates on it: a directly-exposed server must not let a client
+// forge its own apparent address.
 func clientIP(r *http.Request) string {
+	if trustProxyHeaders {
+		if xr := strings.TrimSpace(r.Header.Get("X-Real-IP")); xr != "" {
+			return xr
+		}
+		// X-Forwarded-For is a list; the rightmost entry is the one our own
+		// proxy appended and is the only one it vouches for.
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			parts := strings.Split(xff, ",")
+			if ip := strings.TrimSpace(parts[len(parts)-1]); ip != "" {
+				return ip
+			}
+		}
+	}
 	ip, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr
@@ -185,11 +204,7 @@ func newThrottle(max int, lockout time.Duration) *throttle {
 }
 
 func throttleKey(r *http.Request, username string) string {
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		ip = r.RemoteAddr
-	}
-	return ip + "|" + strings.ToLower(username)
+	return clientIP(r) + "|" + strings.ToLower(username)
 }
 
 // blocked reports whether this key is locked out right now.

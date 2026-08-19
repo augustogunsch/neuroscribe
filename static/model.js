@@ -30,11 +30,13 @@ const ngModel = {
 
 /* ---- sealing and opening the two halves ---- */
 
-async function ngSealRecord(header, body) {
+// ngSealRecord binds the record's kind and half ("h"/"b") into each envelope
+// as associated data, so the server cannot relabel or relocate a sealed value.
+async function ngSealRecord(kind, header, body) {
 	const key = await ngDataKey();
 	if (!key) throw new Error(ngT("Locked, sign in again to read this."));
-	const out = { h: await ngSeal(key, JSON.stringify(header)) };
-	if (body !== undefined && body !== null) out.b = await ngSeal(key, body);
+	const out = { h: await ngSeal(key, JSON.stringify(header), kind + "|h") };
+	if (body !== undefined && body !== null) out.b = await ngSeal(key, body, kind + "|b");
 	return JSON.stringify(out);
 }
 
@@ -52,7 +54,7 @@ async function ngOpenHeader(rec) {
 	const parts = ngParsePayload(rec.payload);
 	if (!key || !parts.h) return null;
 	try {
-		return JSON.parse(await ngOpen(key, parts.h));
+		return JSON.parse(await ngOpen(key, parts.h, rec.kind + "|h"));
 	} catch (err) {
 		return null; // a record this key cannot open is not this account's
 	}
@@ -65,7 +67,7 @@ async function ngOpenBody(ref) {
 	const key = await ngDataKey();
 	const parts = ngParsePayload(rec.payload);
 	if (!key || !parts.b) return "";
-	return ngOpen(key, parts.b);
+	return ngOpen(key, parts.b, rec.kind + "|b");
 }
 
 /* ---- loading ---- */
@@ -148,14 +150,14 @@ function ngByName(a, b) {
 
 async function ngCreateDir(name, parent) {
 	const header = { name: name, parent: parent || "" };
-	const rec = await ngCreate("dir", parent || "", await ngSealRecord(header));
+	const rec = await ngCreate("dir", parent || "", await ngSealRecord("dir", header));
 	ngModel.dirs.set(rec.ref, Object.assign({ ref: rec.ref, rev: 0 }, header));
 	return rec.ref;
 }
 
 async function ngCreateNote(title, parent, type) {
 	const header = { title: title, parent: parent || "", type: type || "", meta: {}, description: "" };
-	const rec = await ngCreate("note", parent || "", await ngSealRecord(header));
+	const rec = await ngCreate("note", parent || "", await ngSealRecord("note", header));
 	ngModel.notes.set(rec.ref, Object.assign({ ref: rec.ref, rev: 0 }, header));
 	// a note with no chapters has nowhere to write, so it starts with one
 	await ngCreateChapter(rec.ref, ngT("Chapter 1"));
@@ -165,14 +167,14 @@ async function ngCreateNote(title, parent, type) {
 async function ngCreateChapter(noteRef, title) {
 	const pos = ngChaptersOf(noteRef).length + 1;
 	const header = { title: title, note: noteRef, pos: pos };
-	const rec = await ngCreate("chapter", noteRef, await ngSealRecord(header, ""));
+	const rec = await ngCreate("chapter", noteRef, await ngSealRecord("chapter", header, ""));
 	ngModel.chapters.set(rec.ref, Object.assign({ ref: rec.ref, rev: 0 }, header));
 	return rec.ref;
 }
 
 async function ngCreateType(name, fields) {
 	const header = { name: name, fields: fields || [] };
-	const rec = await ngCreate("type", "", await ngSealRecord(header));
+	const rec = await ngCreate("type", "", await ngSealRecord("type", header));
 	ngModel.types.set(rec.ref, Object.assign({ ref: rec.ref, rev: 0 }, header));
 	return rec.ref;
 }
@@ -195,10 +197,10 @@ async function ngUpdate(kind, ref, changes, body) {
 	let newBody = body;
 	if (newBody === undefined) {
 		const parts = ngParsePayload(rec.payload);
-		rec.payload = JSON.stringify(Object.assign(ngParsePayload(await ngSealRecord(header)),
+		rec.payload = JSON.stringify(Object.assign(ngParsePayload(await ngSealRecord(kind, header)),
 			parts.b ? { b: parts.b } : {}));
 	} else {
-		rec.payload = await ngSealRecord(header, newBody);
+		rec.payload = await ngSealRecord(kind, header, newBody);
 	}
 	rec.parent = header.parent || header.note || "";
 	await ngPut(rec);

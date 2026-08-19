@@ -2,7 +2,10 @@
 neuroscribe.db
 neuroscribe.db-*
 .playwright-mcp/
-.env.local
+# every local env file (secrets live here) except the checked-in template
+.env
+.env.*
+!.env.example
 backups/
 /pyodide/
 /typst/

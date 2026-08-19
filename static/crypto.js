@@ -84,18 +84,34 @@ async function ngDeriveKeys(password, saltB64) {
 
 /* ---- symmetric encryption ---- */
 
-async function ngSeal(key, plaintext) {
+// ngSeal produces "v1.iv.ct" (no binding) or, when an `aad` context string is
+// given, "v2.iv.ct" with that context as AES-GCM associated data. Binding the
+// record's kind and field into the tag stops a hostile server from serving one
+// sealed value in another's place (a chapter body relabelled as a note header,
+// note A's body under ref B): the tag no longer verifies out of context.
+async function ngSeal(key, plaintext, aad) {
 	const iv = ngRandom(12);
-	const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, ngEnc.encode(plaintext));
-	return "v1." + ngB64(iv) + "." + ngB64(ct);
+	const params = { name: "AES-GCM", iv: iv };
+	if (aad) params.additionalData = ngEnc.encode(aad);
+	const ct = await crypto.subtle.encrypt(params, key, ngEnc.encode(plaintext));
+	return (aad ? "v2." : "v1.") + ngB64(iv) + "." + ngB64(ct);
 }
 
-async function ngOpen(key, blob) {
-	if (typeof blob !== "string" || blob.indexOf("v1.") !== 0) return blob; // not encrypted
+async function ngOpen(key, blob, aad) {
+	// A payload with no version marker never came from ngSeal. There is no
+	// "plaintext fallback": a compromised server could otherwise hand back
+	// cleartext it wrote itself and have it shown as an authentic note. Refuse
+	// anything that is not a sealed envelope this key can actually open.
+	if (typeof blob !== "string" || (blob.indexOf("v1.") !== 0 && blob.indexOf("v2.") !== 0)) {
+		throw new Error("refusing to open unsealed data");
+	}
 	const parts = blob.split(".");
 	if (parts.length !== 3) throw new Error("malformed ciphertext");
-	const plain = await crypto.subtle.decrypt(
-		{ name: "AES-GCM", iv: ngUnB64(parts[1]) }, key, ngUnB64(parts[2]));
+	const params = { name: "AES-GCM", iv: ngUnB64(parts[1]) };
+	// v2 was sealed with associated data; v1 predates the binding and opens
+	// without it, so existing records keep working after an upgrade.
+	if (parts[0] === "v2" && aad) params.additionalData = ngEnc.encode(aad);
+	const plain = await crypto.subtle.decrypt(params, key, ngUnB64(parts[2]));
 	return ngDec.decode(plain);
 }
 

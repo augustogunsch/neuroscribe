@@ -221,7 +221,13 @@ func (s *server) syncPush(w http.ResponseWriter, r *http.Request) {
 		seq++
 		rev := curRev + 1
 		updated := in.UpdatedAt
-		if !timeShape.MatchString(updated) {
+		// The timestamp arrives from the client (a note written offline is older
+		// than its sync), so a past value is legitimate. A future one is not: it
+		// would sort ahead of everything indefinitely, so it is pulled back to
+		// now. (Cross-account trash deletion is stopped where it belongs — the
+		// user_id-scoped purge in db.go — not by trusting this field.) The
+		// format is fixed-width, so a lexical compare is a chronological one.
+		if !timeShape.MatchString(updated) || updated > now {
 			updated = now
 		}
 		deleted := 0
@@ -264,7 +270,10 @@ func payloadIsSealed(payload string) bool {
 		return false
 	}
 	for _, v := range parts {
-		if !strings.HasPrefix(v, "v1.") || strings.Count(v, ".") != 2 {
+		// v1 is the original envelope; v2 additionally binds the record's kind
+		// and field name as AES-GCM associated data (see static/crypto.js). Both
+		// are three dot-separated fields: version, IV, ciphertext.
+		if !(strings.HasPrefix(v, "v1.") || strings.HasPrefix(v, "v2.")) || strings.Count(v, ".") != 2 {
 			return false
 		}
 	}
