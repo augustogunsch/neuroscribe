@@ -178,8 +178,12 @@ function ngTypstRenderer(ctx) {
 			case "space":
 				return;
 			case "heading":
-				// chapters are the level-1 headings, so the note's own start one down
-				out.push("=".repeat(Math.min(t.depth + 1, 6)) + " " + inlines(t.tokens) + "\n");
+				// Chapters are the level-1 headings, and the chapter's own
+				// headings are renumbered relative to its shallowest one: a
+				// chapter written entirely in ### must read as 1.1, 1.2 — not
+				// as 1.0.0.1 with two phantom levels the author never wrote.
+				out.push("=".repeat(Math.min(t.depth - ctx.headingShift + 2, 6)) +
+					" " + inlines(t.tokens) + "\n");
 				return;
 			case "paragraph":
 				out.push(inlines(t.tokens) + "\n");
@@ -261,8 +265,16 @@ function ngMarkdownToTypst(src, ctx) {
 	// placeholders are numbered per chapter; shift them into the document's run
 	const text = base === 0 ? protectedSrc.text
 		: protectedSrc.text.replace(/NGXMATH(\d+)X/g, (_, n) => "NGXMATH" + (base + Number(n)) + "X");
+	const tokens = marked.lexer(text, { gfm: true, breaks: false });
+	// the shallowest heading this chapter actually uses becomes the level
+	// right under the chapter title; deeper ones keep their relative depth
+	let min = Infinity;
+	tokens.forEach(function (t) {
+		if (t.type === "heading" && t.depth < min) min = t.depth;
+	});
+	ctx.headingShift = min === Infinity ? 1 : min;
 	const renderer = ngTypstRenderer(ctx);
-	renderer.blocks(marked.lexer(text, { gfm: true, breaks: false }));
+	renderer.blocks(tokens);
 	return renderer.source();
 }
 
