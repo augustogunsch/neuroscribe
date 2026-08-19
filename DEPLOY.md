@@ -111,15 +111,31 @@ curl -s http://127.0.0.1:8484/healthz    # → ok
 
 ## 4. nginx and TLS
 
+The site config references the certificate, and certbot needs nginx serving
+its challenge to issue one — so the first certificate goes through a
+bootstrap config that serves only the challenge:
+
+```sh
+sudo mkdir -p /var/www/certbot
+sudo cp deploy/nginx-bootstrap.conf /etc/nginx/sites-enabled/certbot-bootstrap.conf
+sudo sed -i 's/notes.example.com/<your domain>/' /etc/nginx/sites-enabled/certbot-bootstrap.conf
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot certonly --webroot -w /var/www/certbot -d <your domain>
+sudo rm /etc/nginx/sites-enabled/certbot-bootstrap.conf
+```
+
+With the certificate on disk, the real config loads:
+
 ```sh
 sudo cp deploy/nginx.conf /etc/nginx/sites-available/neuroscribe
 sudo sed -i 's/notes.example.com/<your domain>/g' /etc/nginx/sites-available/neuroscribe
 sudo ln -s /etc/nginx/sites-available/neuroscribe /etc/nginx/sites-enabled/
-sudo certbot certonly --webroot -w /var/www/certbot -d <your domain>
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-The supplied config already carries the pieces that matter: `Host` and
+Renewals need no bootstrap: the real config keeps the challenge path served
+over plain HTTP, and `certbot renew` reuses the webroot. The supplied config
+already carries the pieces that matter: `Host` and
 `X-Forwarded-Proto` forwarded (host allowlisting and Secure cookies depend on
 them), rate limits on sign-in and sign-up, `sw.js` never cached, sync bodies
 kept off nginx's disk.
