@@ -146,6 +146,20 @@ sudo ln -s /etc/nginx/sites-available/neuroscribe /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
+If certbot fails with `cannot load certificate
+"/etc/letsencrypt/live/<domain>/fullchain.pem" … no such file` from
+`nginx -t`, the site config got enabled before its certificate existed, and
+no issuance method can run on a broken nginx. Take it out of the way, issue,
+put it back:
+
+```sh
+sudo rm /etc/nginx/sites-enabled/neuroscribe
+sudo systemctl reload nginx
+sudo certbot certonly --nginx -d <your domain>
+sudo ln -s /etc/nginx/sites-available/neuroscribe /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
 Renewals need no bootstrap: the real config keeps the challenge path served
 over plain HTTP, and `certbot renew` reuses whichever method issued the
 certificate. The supplied config already carries the pieces that matter: `Host` and
