@@ -64,7 +64,12 @@ func main() {
 	}
 	switch {
 	case srv.registrationOpen():
-		log.Printf("public registration is OPEN — every account shares one workspace for now")
+		log.Printf("public registration is OPEN")
+		// every verification link is built from this URL, so a localhost value
+		// with registration open means every mail sent is a dead link
+		if strings.Contains(srv.mail.baseURL, "127.0.0.1") || strings.Contains(srv.mail.baseURL, "localhost") {
+			log.Printf("warning: NEUROSCRIBE_BASE_URL is %q — emailed verification links will point at this machine, not your domain", srv.mail.baseURL)
+		}
 	case srv.mail.configured():
 		log.Printf("mail is configured; set NEUROSCRIBE_REGISTRATION=open to allow public sign-ups")
 	}

@@ -327,7 +327,22 @@ function ngLockScreen() {
 	});
 	escape.appendChild(forgot);
 
-	box.append(brand, title, hint, form, error, escape);
+	// handing the machine over shouldn't require knowing the PIN: logging out
+	// needs no key, wipes this device's copy, and ends the session
+	const leave = document.createElement("p");
+	leave.className = "login-alt";
+	const logout = document.createElement("a");
+	logout.href = "#";
+	logout.className = "lock-logout";
+	logout.textContent = ngT("Log out");
+	logout.addEventListener("click", function (e) {
+		e.preventDefault();
+		logout.textContent = ngT("Signing out…");
+		ngLogout();
+	});
+	leave.appendChild(logout);
+
+	box.append(brand, title, hint, form, error, escape, leave);
 	overlay.appendChild(box);
 
 	const fail = function (message) {

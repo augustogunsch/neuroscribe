@@ -79,7 +79,15 @@
 	</aside>
 
 	<div class="sidebar-resizer" id="sidebar-resizer" title="Drag to resize"></div>
-	<main class="content" data-view></main>
+	<main class="content" data-view>
+		<!-- visible from the first byte of HTML; the first render replaces it.
+		     Plain markup on purpose: it must not depend on any script loading. -->
+		<div class="boot-splash">
+			<img class="logo boot-logo" src="/static/logo.svg" alt="">
+			<div class="boot-spinner" aria-hidden="true"></div>
+			<p class="page-hint">Loading your notes…</p>
+		</div>
+	</main>
 </div>
 
 <!-- one dialog for every prompt and confirmation; showModal() gives it a

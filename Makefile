@@ -1,7 +1,7 @@
 BINARY  := neuroscribe
 GO      ?= go
 
-.PHONY: all build release run run-open mail-dev pyodide typst vendor assets test vet fmt check hooks clean
+.PHONY: all build release deploy run run-open mail-dev pyodide typst vendor assets test vet fmt check hooks clean
 
 all: build
 
@@ -144,6 +144,27 @@ vendor:
 # Everything the browser needs to run code and typeset. Re-running this on a
 # deployed instance re-verifies every file against assets.sha256.
 assets: vendor pyodide typst
+
+# Deploying changes to the server: cross-compile here, rsync only what
+# differs, restart. The binary embeds every template and script, so a code
+# change is one file; the runtime dirs ride along only when their contents
+# changed (rsync's delta makes an unchanged 150 MB tree a no-op).
+DEPLOY_HOST    ?= vps
+DEPLOY_DIR     ?= /srv/neuroscribe
+DEPLOY_SERVICE ?= neuroscribe
+deploy: release
+	rsync -az --info=NAME dist/$(BINARY)-$(RELEASE_GOOS)-$(RELEASE_GOARCH) \
+		$(DEPLOY_HOST):$(DEPLOY_DIR)/$(BINARY)
+	@for dir in pyodide typst; do \
+		if [ -d $$dir ]; then \
+			rsync -az --delete --info=NAME1 $$dir $(DEPLOY_HOST):$(DEPLOY_DIR)/; \
+		fi; \
+	done
+	ssh $(DEPLOY_HOST) 'chown -R neuroscribe:neuroscribe $(DEPLOY_DIR) \
+		&& chmod 700 $(DEPLOY_DIR) && chmod +x $(DEPLOY_DIR)/$(BINARY) \
+		&& systemctl restart $(DEPLOY_SERVICE) \
+		&& sleep 1 && $(DEPLOY_DIR)/$(BINARY) healthcheck'
+	@echo "deployed and healthy"
 
 # Local mail catcher: SMTP on 1025, inbox at http://localhost:8025
 mail-dev:

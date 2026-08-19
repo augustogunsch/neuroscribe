@@ -144,10 +144,10 @@ func (s *server) hasUsers() bool {
 }
 
 func (s *server) showLogin(w http.ResponseWriter, r *http.Request) {
-	if s.currentUser(r) != "" {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
+	// Deliberately shown to signed-in users too. A session cookie proves who
+	// you are; it does not decrypt anything — a fresh tab has no data key, and
+	// re-entering the password here is how it gets one. Bouncing signed-in
+	// visitors to "/" would trap a keyless tab in a redirect loop.
 	s.renderPage(w, r, "login.html", loginPage{
 		NoUsers:      !s.hasUsers(),
 		Registration: s.registrationOpen(),

@@ -32,6 +32,11 @@ func (s *server) appShell(w http.ResponseWriter, r *http.Request) {
 	// The shell must never be served stale after an upgrade — it names the
 	// asset versions the rest of the app is loaded from.
 	w.Header().Set("Cache-Control", "no-cache")
+	// The marker the service worker caches by. Without it the worker would
+	// cache whatever "/" returns — including the signed-out landing page —
+	// and then serve that for every app navigation: a blank app that no
+	// amount of reloading fixes, because the poisoned copy answers first.
+	w.Header().Set("X-NG-Shell", "1")
 	s.renderPage(w, r, "app.html", s.shell(r))
 }
 

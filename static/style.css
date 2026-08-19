@@ -765,7 +765,19 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
 	color: var(--text);
 	text-decoration: none;
 }
-.landing-actions { display: flex; gap: 0.5rem; }
+.landing-actions { display: flex; gap: 0.5rem; align-items: center; }
+/* the repo link: an icon among buttons, so it gets their hit area without
+   their chrome */
+.gh-link {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0.45rem;
+	border-radius: 8px;
+	color: var(--text-dim);
+}
+.gh-link:hover { color: var(--text); background: var(--bg-soft); }
+.gh-mark { display: block; }
 .landing {
 	position: relative;
 	z-index: 1;
@@ -934,6 +946,10 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
 	align-items: center;
 	justify-content: center;
 	gap: 0.5rem;
+	color: var(--text);
+	text-decoration: none;
+	font-size: 1.15rem;
+	font-weight: 700;
 	font-size: 1.3rem;
 	font-weight: 700;
 	margin-bottom: 1.2rem;
@@ -1139,4 +1155,32 @@ body.is-locked { overflow: hidden; }
 	gap: 0.4rem;
 	font-size: 0.85rem;
 	padding: 0.35rem 0;
+}
+
+/* ---- boot splash ----
+ *
+ * Shown by the shell itself before any script has run, so a slow connection
+ * or a cold cache gets a breathing page instead of a blank column.
+ */
+
+.boot-splash {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 1rem;
+	min-height: 60vh;
+}
+.boot-logo { width: 48px; height: 48px; }
+.boot-spinner {
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	border: 2px solid var(--border);
+	border-top-color: var(--accent);
+	animation: ng-spin 0.9s linear infinite;
+}
+@keyframes ng-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+	.boot-spinner { animation: none; border-top-color: var(--border); }
 }

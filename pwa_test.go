@@ -39,6 +39,23 @@ func TestEveryAppAddressReturnsTheSameShell(t *testing.T) {
 // The shell is cached and handed to every page, so anything account-specific
 // in it would be shown for the wrong note — and anything readable in it would
 // have defeated the encryption.
+// The worker caches "/" only when this marker is present; without the guard a
+// signed-out landing page gets cached as "the shell" and every navigation
+// serves a document the app cannot boot from.
+func TestShellIsMarkedAndLandingIsNot(t *testing.T) {
+	ts, ck, _ := newTestServer(t)
+	if got := doGet(t, ts, ck, "/").Header.Get("X-NG-Shell"); got != "1" {
+		t.Errorf("the app shell is not marked: %q", got)
+	}
+	if got := doGet(t, ts, nil, "/").Header.Get("X-NG-Shell"); got != "" {
+		t.Errorf("the signed-out landing page is marked as the shell: %q", got)
+	}
+	sw := readAsset(t, "static/sw.js")
+	if !strings.Contains(sw, `headers.get("X-NG-Shell")`) {
+		t.Error("the worker no longer gates the shell cache on the marker")
+	}
+}
+
 func TestShellCarriesNoContent(t *testing.T) {
 	ts, ck, _ := newTestServer(t)
 	shell := bodyOf(t, doGet(t, ts, ck, "/"))

@@ -57,10 +57,10 @@ type registerPage struct {
 	Done     bool
 }
 
-// registrationOpen requires both a working mailer and an explicit opt-in.
-// The switch exists because notes are not yet partitioned per user: until
-// they are, every account shares one workspace, so opening sign-ups must be
-// a deliberate act rather than a side effect of configuring SMTP.
+// registrationOpen requires both a working mailer and an explicit opt-in:
+// sign-up without verification mail would strand every account, and running
+// an open instance should be a deliberate act rather than a side effect of
+// configuring SMTP.
 func (s *server) registrationOpen() bool {
 	return s.mail.configured() && s.registrationFlag
 }

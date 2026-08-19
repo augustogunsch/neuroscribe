@@ -286,6 +286,11 @@ var translations = map[string]map[string]string{
 		"Your notes are re-locked under the new password without being re-encrypted: the key that seals them never changes and never leaves this browser. Every other signed-in device is signed out.": "Suas notas passam a ser trancadas pela nova senha sem serem recriptografadas: a chave que as lacra nunca muda e nunca sai deste navegador. Todos os outros dispositivos conectados são desconectados.",
 		"record limit reached (%d)": "limite de registros atingido (%d)",
 
+		"Source code on GitHub": "Código-fonte no GitHub",
+		"Source code":           "Código-fonte",
+
+		"Signing out…": "Saindo…",
+
 		// code / run
 		"Run":                "Executar",
 		"Running…":           "Executando…",

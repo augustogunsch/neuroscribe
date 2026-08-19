@@ -316,6 +316,33 @@ function ngMdToolbar(area, noteRef) {
 		}));
 }
 
+/* ---- signing out ----
+ *
+ * One implementation for every way out — the sidebar form and the lock
+ * screen's escape. Local data goes with the session: the records are sealed,
+ * but a shared machine has no business keeping them. Needs no key and no PIN,
+ * so it works from behind the lock.
+ */
+
+async function ngLogout() {
+	try {
+		await ngWipeLocal();
+		if (typeof ngClearPin === "function") ngClearPin();
+		ngForgetDataKey();
+		if (window.caches) {
+			for (const name of await caches.keys()) {
+				if (name.startsWith("ng-shell-") || name.startsWith("ng-assets-")) await caches.delete(name);
+			}
+		}
+	} catch (err) { /* signing out must happen regardless */ }
+	await fetch("/logout", {
+		method: "POST",
+		headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": csrfToken() },
+		body: new URLSearchParams({ csrf_token: csrfToken() }),
+	}).catch(function () {});
+	location.href = "/login";
+}
+
 /* ---- links and global actions ---- */
 
 function ngWireGlobalActions() {
@@ -347,26 +374,11 @@ function ngWireGlobalActions() {
 	// cached, so its token is supplied at the moment of submitting rather than
 	// baked in. Local data goes with it: the records are sealed, but a shared
 	// machine has no business keeping them.
-	document.addEventListener("submit", async function (e) {
+	document.addEventListener("submit", function (e) {
 		const form = e.target.closest("form.logout-form");
 		if (!form) return;
 		e.preventDefault();
-		try {
-			await ngWipeLocal();
-			if (typeof ngClearPin === "function") ngClearPin();
-			ngForgetDataKey();
-			if (window.caches) {
-				for (const name of await caches.keys()) {
-					if (name.startsWith("ng-shell-") || name.startsWith("ng-assets-")) await caches.delete(name);
-				}
-			}
-		} catch (err) { /* signing out must happen regardless */ }
-		await fetch("/logout", {
-			method: "POST",
-			headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": csrfToken() },
-			body: new URLSearchParams({ csrf_token: csrfToken() }),
-		}).catch(function () {});
-		location.href = "/login";
+		ngLogout();
 	});
 
 	window.addEventListener("popstate", ngRender);
@@ -380,7 +392,17 @@ async function ngBootApp() {
 	await ngLoadStrings();
 	ngWireGlobalActions();
 	ngWireSyncStatus();
-	if (ngLocked()) return; // lock.js has the screen; it will call back
+	if (ngLocked()) {
+		// No key in this tab. With a PIN on this device the lock screen takes
+		// over; without one the only way back to readable notes is the
+		// password, so go where it is asked for. Doing neither would leave a
+		// signed-in tab blank forever — sessionStorage is per tab.
+		if (typeof ngPinFor === "function" && ngPinFor(document.body.dataset.user || "")) {
+			return; // lock.js has the screen; it will call back
+		}
+		location.href = "/login";
+		return;
+	}
 	await ngLoadModel();
 	await ngRender();
 	ngStartSync();

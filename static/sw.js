@@ -72,7 +72,10 @@ self.addEventListener("install", function (event) {
 			return cache.add(new Request(url, { cache: "reload" })).catch(function () {});
 		}));
 		const shell = await caches.open(NG_SHELL_CACHE);
-		await shell.add(new Request("/", { cache: "reload" })).catch(function () {});
+		try {
+			const resp = await fetch(new Request("/", { cache: "reload" }), { credentials: "same-origin" });
+			if (resp.ok && resp.headers.get("X-NG-Shell")) await shell.put("/", resp);
+		} catch (err) { /* first navigation will cache it instead */ }
 		self.skipWaiting();
 	})());
 });
@@ -132,11 +135,18 @@ self.addEventListener("fetch", function (event) {
 // round trip for a page that has no content in it.
 async function ngShellResponse(request) {
 	const cache = await caches.open(NG_SHELL_CACHE);
-	const cached = await cache.match("/");
+	let cached = await cache.match("/");
+	// Only the real app shell is ever cached — the server marks it. "/" also
+	// answers with the landing page when signed out, and caching that would
+	// poison every navigation with a document the app cannot boot from.
+	if (cached && !cached.headers.get("X-NG-Shell")) {
+		await cache.delete("/");
+		cached = undefined;
+	}
 	const network = fetch("/", { credentials: "same-origin" }).then(function (resp) {
-		// A redirect to /login means the session ended: pass it through rather
-		// than showing a signed-in shell that cannot sync.
-		if (resp.ok && resp.type === "basic") cache.put("/", resp.clone());
+		if (resp.ok && resp.type === "basic" && resp.headers.get("X-NG-Shell")) {
+			cache.put("/", resp.clone());
+		}
 		return resp;
 	});
 	if (cached) {
