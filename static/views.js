@@ -2,15 +2,14 @@
 
 /* The pages.
  *
- * These used to be Go templates. They are here now because a template needs a
- * server, and the point of the offline rewrite is that a reader on a plane
- * gets the same app as one at a desk. Every view reads the in-memory model
- * (model.js), which was built from IndexedDB, which is the source of truth.
+ * Built here rather than on a server, because a server cannot be assumed: the
+ * point of an offline-first app is that a reader on a plane gets the same app
+ * as one at a desk. Every view reads the in-memory model (model.js), which was
+ * built from IndexedDB, which is the source of truth.
  *
- * The markup deliberately reproduces what the templates used to emit — same
- * elements, same class names — because style.css was written against that
- * vocabulary and the design was already right. Anything invented here would
- * be a page the stylesheet has never heard of.
+ * The markup and style.css share one vocabulary — the class names here are the
+ * ones the stylesheet is written against, so a view that invents its own would
+ * render unstyled.
  *
  * Nothing here touches the network. Writing calls into model.js, which stores
  * locally and lets sync.js worry about the server later.
@@ -42,9 +41,9 @@ function ngSetTitle(title) {
 
 /* ---- the sidebar tree ----
  *
- * The same <details>/<summary> structure the server used to render: folders
- * fold natively, notes are .notelink anchors, and the row actions appear on
- * hover exactly as the stylesheet expects.
+ * A <details>/<summary> tree: folders fold natively, notes are .notelink
+ * anchors, and the row actions appear on hover exactly as the stylesheet
+ * expects.
  */
 
 const ngClosedDirs = new Set(); // folders default open, as they always did

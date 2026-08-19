@@ -88,10 +88,10 @@ func (s *server) savePrefs(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// serveStrings hands over a whole language. The interface used to be
-// translated by the templates, which stops working the moment the templates
-// stop being rendered per page — so the table goes to the browser, where it is
-// cached with everything else and works with the network off.
+// serveStrings hands over a whole language. Pages are built in the browser,
+// so there is no per-page rendering step for a template to translate in — the
+// whole table goes to the browser instead, where it is cached with everything
+// else and works with the network off.
 func (s *server) serveStrings(w http.ResponseWriter, r *http.Request) {
 	lang := strings.TrimSuffix(r.PathValue("lang"), ".json")
 	if !validLang(lang) {
@@ -151,9 +151,9 @@ func (s *server) serveServiceWorker(w http.ResponseWriter, r *http.Request) {
 	}
 	// The cache names carry a version, and a worker only reinstalls when its
 	// own bytes change. Deriving that version from the build means adding a
-	// file to the precache list is enough — nobody has to remember to bump a
-	// constant, and forgetting used to mean the new file was simply never
-	// cached, which only showed up offline.
+	// file to the precache list is enough on its own — with a hand-bumped
+	// constant, forgetting the bump would leave the new file uncached, a
+	// mistake that only ever shows up offline.
 	body = []byte(strings.Replace(string(body), `const NG_VERSION = "v1";`,
 		"const NG_VERSION = \""+s.assetVersion+"\";", 1))
 	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")

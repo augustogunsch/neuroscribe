@@ -155,8 +155,8 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.mux.ServeHTTP(w, r)
 		return
 	}
-	// everything is served from this origin now (KaTeX and htmx are vendored),
-	// so no third-party host may execute script here. 'unsafe-inline' remains
+	// everything is served from this origin (every library is vendored), so
+	// no third-party host may execute script here. 'unsafe-inline' remains
 	// for style only: KaTeX sets inline styles on the spans it renders.
 	h.Set("Content-Security-Policy",
 		"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "+

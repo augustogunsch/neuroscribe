@@ -12,7 +12,7 @@
 		if (localStorage.getItem("ng-sidebar-collapsed") === "1") {
 			root.setAttribute("data-sidebar", "collapsed");
 		}
-		/* dark unless asked otherwise, as it has always been */
+		/* dark unless asked otherwise */
 		root.setAttribute("data-theme", localStorage.getItem("ng-theme") || "dark");
 	} catch (e) {
 		/* private mode / storage disabled: fall back to the defaults */

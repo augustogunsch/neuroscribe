@@ -76,9 +76,9 @@ TYPST_NPM      := https://registry.npmjs.org/@myriaddreamin
 TYPST_ASSETS   := https://raw.githubusercontent.com/typst/typst-assets/main/files/fonts
 MITEX_VERSION  := 0.2.5
 
-# New Computer Modern is the Computer Modern the old LaTeX export used, so
-# documents keep the face they had. The math font is what makes formulas work
-# at all — Typst needs a real OpenType MATH table.
+# New Computer Modern is the classic TeX face, so exported PDFs read like
+# LaTeX documents. The math font is what makes formulas work at all — Typst
+# needs a real OpenType MATH table.
 TYPST_FONTS := NewCM10-Regular.otf NewCM10-Bold.otf NewCM10-Italic.otf \
 	NewCM10-BoldItalic.otf NewCMMath-Regular.otf \
 	DejaVuSansMono.ttf DejaVuSansMono-Bold.ttf
@@ -112,7 +112,7 @@ typst:
 	@rm -rf typst/dl
 	@echo "typst ready: $$(du -sh typst | cut -f1)"
 
-# Vendored browser libraries (DOMPurify, marked, htmx, KaTeX, Altcha) live in
+# Vendored browser libraries (DOMPurify, marked, KaTeX, Altcha, zxcvbn) live in
 # static/vendor, committed and embedded in the binary. They are pinned in
 # assets.sha256 like everything else the browser runs; this re-verifies the
 # committed copies in place and re-fetches only one that has gone missing.
@@ -121,7 +121,6 @@ VENDOR_NPM := https://cdn.jsdelivr.net/npm
 vendor:
 	@$(FETCH) $(VENDOR_NPM)/dompurify@3.1.6/dist/purify.min.js  static/vendor/purify.min.js
 	@$(FETCH) $(VENDOR_NPM)/marked@12.0.2/marked.min.js         static/vendor/marked.min.js
-	@$(FETCH) $(VENDOR_NPM)/htmx.org@2.0.4/dist/htmx.min.js     static/vendor/htmx.min.js
 	@$(FETCH) $(VENDOR_NPM)/katex@0.16.21/dist/katex.min.js     static/vendor/katex.min.js
 	@$(FETCH) $(VENDOR_NPM)/katex@0.16.21/dist/katex.min.css    static/vendor/katex.min.css
 	@$(FETCH) $(VENDOR_NPM)/altcha@1.0.6/dist/altcha.min.js     static/vendor/altcha.min.js

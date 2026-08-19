@@ -2,11 +2,11 @@ package main
 
 // Syntax-highlight stylesheet generation.
 //
-// Markdown is no longer rendered on the server: notes are end-to-end encrypted,
-// so the server cannot read them, and the whole parse/sanitize/highlight
-// pipeline runs in the browser (see static/e2e.js). All that remains here is
-// the chroma stylesheet the client highlighter's class names refer to, served
-// at /static/chroma.css.
+// Notes are end-to-end encrypted, so the server cannot read them, let alone
+// render them: the whole parse/sanitize/highlight pipeline runs in the browser
+// (static/render.js). The server's only part in it is this stylesheet — the
+// class names the client highlighter emits resolve against the chroma theme
+// served at /static/chroma.css.
 
 import (
 	"bytes"

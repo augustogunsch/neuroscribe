@@ -126,9 +126,9 @@ Optional host dependencies:
   Python reports itself unavailable.
 - `make typst` fetches the **Typst** typesetter (WebAssembly), the New
   Computer Modern fonts and the **mitex** package into `./typst` (~33 MB, not
-  in git). This replaces the TeX installation the server used to need: the
-  browser typesets, so nothing but static files is served. Without it PDF
-  export reports itself unavailable.
+  in git). The browser typesets, so the server needs no TeX installation and
+  serves nothing but static files. Without it PDF export reports itself
+  unavailable.
 
 `make assets` fetches both. Both are detected at startup; the UI degrades
 gracefully without them, and every file is checked against `assets.sha256`.
@@ -152,8 +152,7 @@ gracefully without them, and every file is checked against `assets.sha256`.
   and shown on the note's metadata card and in the PDF title block.
 - **Chapters** — each note is an ordered list of chapters. The note page is
   a table of contents; every chapter is its own page with prev/next
-  navigation and in-place editing (htmx partial swaps), reorderable from the
-  note page.
+  navigation and in-place editing, reorderable from the note page.
 - **Markdown** — GFM (tables, task lists, strikethrough, autolinks), parsed in
   the browser by marked, because the server cannot read a note to render it.
 - **Math** — `$…$` inline and `$$…$$` display (multi-line environments
@@ -175,8 +174,8 @@ gracefully without them, and every file is checked against `assets.sha256`.
   title page, metadata block and table of contents), converted Markdown→Typst
   and compiled in the browser; attached images are embedded and code keeps its
   highlighting. Formulas stay written in LaTeX — mitex translates them — and
-  the result is set in Computer Modern, so documents look as they did when
-  pdflatex produced them. Nothing is sent anywhere.
+  the result is set in Computer Modern — the classic LaTeX look. Nothing is
+  sent anywhere.
 - **Plans** — quotas keep one account from filling the disk, and appear only in
   settings. Free: 500 notes, 20 images of 5 MiB, 500 KiB per chapter. Premium:
   5000 notes, 500 images of 10 MiB, 8 MiB per chapter. Set the `plan` column
@@ -217,11 +216,11 @@ installs it as a git pre-commit hook (`.githooks/pre-commit`).
 
 ## Architecture
 
-htmx philosophy throughout: the backend renders HTML (`html/template`), htmx
-swaps fragments for chapter editing, and a small vanilla `app.js` handles
-KaTeX, run buttons, and sidebar prompts. No JSON API. Storage is SQLite
-(`modernc.org/sqlite`, pure Go — no cgo). Templates and static assets are
-embedded in the binary.
+The browser is the application: vanilla JavaScript builds every page from the
+local store, and the server is a small Go binary that authenticates, serves
+static assets and syncs sealed records. No framework on either side. Storage
+is SQLite on the server (`modernc.org/sqlite`, pure Go — no cgo) and IndexedDB
+in the browser. Templates and static assets are embedded in the binary.
 
 ```
 main.go       entrypoint
@@ -295,9 +294,9 @@ GNU General Public License v3.0 — see [LICENSE](LICENSE).
 
 ## Security
 
-- **Markdown/XSS**: notes are rendered in the browser now, so DOMPurify is the
-  whole boundary rather than a second opinion behind goldmark — and the page it
-  protects holds the key to every note. It runs as an *allowlist*: a fixed set
+- **Markdown/XSS**: notes are rendered in the browser, so DOMPurify is the
+  whole boundary — and the page it protects holds the key to every note. It
+  runs as an *allowlist*: a fixed set
   of tags and attributes (no `svg`, `math`, `iframe`, `style` or form controls),
   a URI pattern that admits only http(s), mailto and relative links, `class`
   narrowed to the `language-*` marker a code fence needs, and `data-*` refused
@@ -310,16 +309,15 @@ GNU General Public License v3.0 — see [LICENSE](LICENSE).
   `eval`, no `wasm-unsafe-eval`. Both things that need to build code from a
   string are pushed off it: the typesetter into a module worker and the snippet
   runner into a sandboxed frame, each with its own narrower policy on its own
-  response. KaTeX, htmx, marked and DOMPurify are vendored under
+  response. KaTeX, marked, DOMPurify, Altcha and zxcvbn are vendored under
   `static/vendor/`, so no third-party origin can execute code here and there is
   nothing to pin with SRI. No inline scripts or event handlers anywhere.
   (`style-src` keeps `'unsafe-inline'`: KaTeX styles the spans it renders.)
 - **DNS rebinding**: requests whose `Host` header is not in the allowlist are
   refused, so a hostile page cannot point its own domain at this server and
   drive it from the victim's browser.
-- **CSRF**: every unsafe method requires a double-submit token (HttpOnly
-  cookie + value echoed from the page: hidden field on plain forms,
-  `hx-headers` for htmx, `X-CSRF-Token` for fetch) *and* passes an
+- **CSRF**: every unsafe method requires a double-submit token (cookie +
+  `X-CSRF-Token` header echoed by same-origin script) *and* passes an
   Origin/Referer check. `form-action 'self'` and `base-uri 'none'` round it out.
 - **Login throttle**: 5 failed attempts per (IP, username) trigger a 15-minute
   lockout, on top of the dummy-bcrypt timing equalization.
@@ -345,9 +343,8 @@ GNU General Public License v3.0 — see [LICENSE](LICENSE).
   `NEUROSCRIBE_ALLOWED_HOSTS` if exposed beyond localhost.
 - **Exports and plaintext**: there is none. No route accepts note text —
   Markdown rendering, snippet execution, PDF typesetting and zip export all
-  happen in the browser, so the server never holds a decrypted note, and the
-  RAM scratch directories, file shredding and buffer zeroing that used to
-  contain that exposure are gone with the code that needed them.
+  happen in the browser, so the server never holds a decrypted note, even
+  briefly. There is nothing to wipe, shred or zero, because nothing arrives.
 - **Supply chain**: `make assets` downloads a Python interpreter and a
   typesetter that then execute in every reader's browser, from a CDN, an npm
   registry and a mutable git branch. Every file is pinned by SHA-256 in

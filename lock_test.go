@@ -156,9 +156,11 @@ func TestLockAndStrengthAreWiredIn(t *testing.T) {
 			t.Errorf("register page is missing %s", want)
 		}
 	}
-	// The old bcrypt-era cap would have blocked a passphrase.
+	// A 72-character cap is bcrypt's input limit leaking into the UI. The
+	// server hashes a fixed-length derived key, never the password, so a cap
+	// that blocks long passphrases has no reason to exist here.
 	if strings.Contains(reg, `maxlength="72"`) {
-		t.Error("the password field still carries the old 72-character limit")
+		t.Error("the password field carries a 72-character limit that would block passphrases")
 	}
 
 	if r := doGet(t, ts, ck, "/static/vendor/zxcvbn.min.js"); r.StatusCode != 200 {

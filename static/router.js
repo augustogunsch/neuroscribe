@@ -174,8 +174,8 @@ async function ngRenameChapterPrompt(chapter) {
 	ngRender();
 }
 
-// Notes used to be dragged between folders; the tree is rebuilt per render
-// now, so an explicit picker is the honest version of the same action.
+// The keyboard-and-touch counterpart of dragging a note onto a folder: the
+// same one-field move, through an explicit picker.
 async function ngMoveNotePrompt(note) {
 	const options = [{ ref: "", name: ngT("(top level)") }]
 		.concat(Array.from(ngModel.dirs.values()).sort(ngByName));
@@ -201,8 +201,8 @@ async function ngMoveNotePrompt(note) {
 	);
 }
 
-// The metadata editor takes over the meta-card in place, the way the old
-// in-page editor did, rather than replacing the whole page.
+// The metadata editor takes over the meta-card in place rather than
+// replacing the whole page.
 async function ngEditMeta(note) {
 	const type = ngModel.types.get(note.type);
 	const fields = (type && type.fields) || [];

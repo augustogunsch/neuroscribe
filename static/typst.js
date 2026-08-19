@@ -1,13 +1,11 @@
 /* Typesetting, in the browser.
  *
- * PDFs used to be built on the server: the page decrypted a note, posted the
- * plaintext back, and pdflatex ran over it in a shredded scratch directory.
- * That was the last place a note existed in the clear outside this tab.
- *
- * Typst replaces LaTeX here for one reason: it compiles to WebAssembly, so the
- * typesetter fits in the browser. Notes are read where their keys already are,
- * and the server is left with nothing to leak. Formulas are still written in
- * LaTeX — mitex translates them — so existing notes keep working.
+ * A PDF is the one export that needs a real typesetting engine, and sending a
+ * decrypted note to the server for it would be the only place plaintext ever
+ * travelled. So the engine comes here instead: Typst, because it compiles to
+ * WebAssembly and LaTeX does not. Notes are typeset where their keys already
+ * are, and the server has nothing to leak. Formulas are written in LaTeX —
+ * mitex translates them — so the math notation is the one everyone knows.
  *
  * This file builds the Typst source; typst-worker.js compiles it.
  */

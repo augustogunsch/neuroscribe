@@ -465,11 +465,11 @@ var translations = map[string]map[string]string{
 		"What you write is encrypted with this password before it leaves your device. There is no recovery: if you lose the password, the writing is unreadable forever.": "O que você escreve é criptografado com esta senha antes de sair do seu dispositivo. Não há recuperação: se perder a senha, o texto fica ilegível para sempre.",
 		"Titles, folder names and images are not encrypted, settings explains exactly what the server can read.":                                                          "Títulos, nomes de pastas e imagens não são criptografados, as configurações explicam exatamente o que o servidor consegue ler.",
 		"JavaScript is required: your keys are derived in the browser.":                                                                                                   "JavaScript é necessário: suas chaves são derivadas no navegador.",
-		"Locked, sign in again to read this.":                                                  "Bloqueado, entre novamente para ler isto.",
-		"Locked, sign in again to save.":                                                       "Bloqueado, entre novamente para salvar.",
-		"This account predates encryption and can no longer be used. Please sign up again.":    "Esta conta é anterior à criptografia e não pode mais ser usada. Cadastre-se novamente.",
-		"Your browser could not prepare the encryption keys. Enable JavaScript and try again.": "Seu navegador não conseguiu preparar as chaves de criptografia. Ative o JavaScript e tente novamente.",
-		"We could not send the confirmation email. Please try again later.":                    "Não foi possível enviar o email de confirmação. Tente novamente mais tarde.",
+		"Locked, sign in again to read this.": "Bloqueado, entre novamente para ler isto.",
+		"Locked, sign in again to save.":      "Bloqueado, entre novamente para salvar.",
+		"This account is missing its encryption keys and cannot be used. Please sign up again.": "Esta conta está sem suas chaves de criptografia e não pode ser usada. Cadastre-se novamente.",
+		"Your browser could not prepare the encryption keys. Enable JavaScript and try again.":  "Seu navegador não conseguiu preparar as chaves de criptografia. Ative o JavaScript e tente novamente.",
+		"We could not send the confirmation email. Please try again later.":                     "Não foi possível enviar o email de confirmação. Tente novamente mais tarde.",
 
 		// login
 		"Sign in":                     "Entrar",

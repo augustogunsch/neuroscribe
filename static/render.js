@@ -2,10 +2,9 @@
 
 /* Turning a decrypted note into a page.
  *
- * This was always the browser's job — the server has not been able to read a
- * note since encryption landed. What changed with offline-first is only where
- * the text comes from: IndexedDB rather than a data attribute the server put
- * on the page.
+ * The server cannot read a note, so it cannot render one either: parsing,
+ * sanitizing and typesetting all happen here, over text decrypted from the
+ * local store.
  */
 
 /* ---- markdown, rendered here because the server cannot read it ---- */
@@ -46,8 +45,8 @@ function ngRestoreMath(root, stash) {
 	});
 }
 
-// Code blocks get the same shell the server used to emit, so the Run button
-// and styling keep working.
+// Code blocks are wrapped in the shell the stylesheet and the Run button
+// expect: a .codeblock with a header naming the language.
 function ngDressCodeBlocks(root) {
 	root.querySelectorAll("pre > code").forEach(function (code) {
 		const pre = code.parentNode;
@@ -71,12 +70,10 @@ function ngDressCodeBlocks(root) {
 
 /* ---- rendering a note ----
  *
- * Markdown became the browser's job when the server stopped being able to read
- * it, and that moved the whole XSS question here. On the server, goldmark ran
- * without WithUnsafe and bluemonday filtered what came out; marked has no such
- * scruples and passes raw HTML straight through. DOMPurify is therefore not a
- * second opinion any more — it is the only thing between a note and this page,
- * and this page holds the key that decrypts every other note.
+ * The server cannot read Markdown, so the whole XSS question lives here.
+ * marked passes raw HTML straight through by design, which makes DOMPurify
+ * the only thing standing between a note and this page — and this page holds
+ * the key that decrypts every other note.
  *
  * So it is configured as an allowlist rather than a list of things to forbid:
  * anything not named below does not survive, including whatever appears in

@@ -3,14 +3,14 @@ package main
 // Authentication: bcrypt-hashed users, random session tokens (stored hashed),
 // HttpOnly SameSite=Lax cookies.
 //
-// Accounts are created through the public sign-up form and nowhere else. There
-// used to be a `neuroscribe user` subcommand for managing them, and it is gone
-// on purpose: with end-to-end encryption the server cannot rotate a password
-// (only the browser holds the key that unwraps the data key), so the one thing
-// the CLI most looked like it could do, it could not. Everything else it did —
-// listing accounts, verifying an address, setting a plan, deleting a user — is
-// a single SQL statement against the database file, available to anyone with
-// the shell access that running the CLI would have required anyway.
+// Accounts are created through the public sign-up form and nowhere else, and
+// there is deliberately no account-management CLI: with end-to-end encryption
+// the server cannot rotate a password (only the browser holds the key that
+// unwraps the data key), so the one thing such a CLI would most look like it
+// could do, it could not. Everything else — listing accounts, verifying an
+// address, setting a plan, deleting a user — is a single SQL statement against
+// the database file, available to anyone with the shell access a CLI would
+// have required anyway.
 
 import (
 	"context"
@@ -205,7 +205,7 @@ func (s *server) doLogin(w http.ResponseWriter, r *http.Request) {
 		// created before end-to-end encryption: there is no key to unlock with
 		w.WriteHeader(http.StatusForbidden)
 		s.renderPage(w, r, "login.html", loginPage{
-			Error:        s.translate("This account predates encryption and can no longer be used. Please sign up again."),
+			Error:        s.translate("This account is missing its encryption keys and cannot be used. Please sign up again."),
 			Registration: s.registrationOpen(),
 			CSRF:         csrfFromContext(r),
 		})

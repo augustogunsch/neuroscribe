@@ -1,6 +1,6 @@
 package main
 
-// Typesetting moved into the browser. These tests pin down what that was for:
+// Typesetting happens in the browser. These tests pin down what that buys:
 // the server must have no way to be handed a note, and the permission the
 // compiler needs must not reach the page that holds the keys.
 
@@ -13,8 +13,8 @@ import (
 
 func TestServerWillNotTypesetANote(t *testing.T) {
 	ts, ck, _ := newTestServer(t)
-	// the endpoint that used to accept one decrypted note is gone: nothing
-	// here will take a note in the clear, whoever asks
+	// no endpoint takes a note in the clear, whoever asks and however
+	// plausible the route looks
 	resp := doPost(t, ts, ck, "/notes/1/pdf", url.Values{})
 	if resp.StatusCode < 400 {
 		t.Fatalf("the server still accepts a note to typeset: %d", resp.StatusCode)

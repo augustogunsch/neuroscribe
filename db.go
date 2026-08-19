@@ -27,12 +27,13 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(lower(email)) WHERE email != '';
 
 -- Everything the reader owns lives here as one opaque record per note,
--- chapter, folder, note type or image. The server used to keep five tables
--- with columns for parents, positions and titles; once all of that became
--- ciphertext it was keeping shapes it could not read, so the shape moved to
--- the browser and what remains is a synchronised bag of sealed blobs.
+-- chapter, folder, note type or image. There are no tables for parents,
+-- positions or titles: all of that is ciphertext, and a schema that modelled
+-- shapes the server cannot read would only describe the account to whoever
+-- reads the database. The shape lives inside the sealed payload, reassembled
+-- by the browser; what the server keeps is a synchronised bag of sealed blobs.
 --
--- What the server still needs, and only this:
+-- What the server needs, and only this:
 --   ref        the client-generated address, so a device offline can mint one
 --   kind       to count notes and images against a plan
 --   seq        a per-account counter: the cursor a device pulls changes from

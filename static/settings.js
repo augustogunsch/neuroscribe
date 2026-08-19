@@ -10,10 +10,9 @@
 
 /* ---- language ----
  *
- * The interface used to be translated by the templates. With one shell for
- * every page there is nothing left to translate server-side, so a whole
- * language is fetched once and kept — including for the next time there is no
- * network.
+ * Pages are built in the browser, so there is no server-side rendering step
+ * to translate in. A whole language is fetched once as a table and kept —
+ * including for the next time there is no network.
  */
 
 async function ngLoadStrings() {
@@ -296,8 +295,8 @@ function ngPasswordCard() {
 	]);
 }
 
-// ngPinCard rebuilds the PIN panel exactly as the old template shaped it:
-// lock.js finds it by these data attributes and wires the behaviour.
+// ngPinCard builds the PIN panel. lock.js finds it by these data attributes
+// and wires the behaviour, so the two form a single contract.
 function ngPinCard() {
 	const idle = ngEl("select", { "data-pin-idle": true }, [
 		["1", ngT("1 minute")], ["5", ngT("5 minutes")], ["15", ngT("15 minutes")],

@@ -2,12 +2,11 @@ package main
 
 // Serving the browser's code runtime.
 //
-// Snippets used to run here, in a throwaway container per execution. They no
-// longer run on the server at all: Python is CPython compiled to WebAssembly
+// Snippets never run on the server. Python is CPython compiled to WebAssembly
 // and JavaScript is the browser's own engine, both driven from a sandboxed
-// frame (static/runner.js). This file only hands out the runtime files.
+// frame (static/runner.js); this file only hands out the runtime files.
 //
-// That trade is worth stating plainly. The server loses the ability to execute
+// That trade is worth stating plainly. The server has no way to execute
 // anything a user writes — no container runtime, no daemon socket, no process
 // spawned from note content — and in exchange it serves a few hundred megabytes
 // of static assets. The snippet, its output and any data it touches stay in the

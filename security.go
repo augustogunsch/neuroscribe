@@ -110,13 +110,12 @@ func isHTTPS(r *http.Request) bool {
 
 // ensureCSRF returns the request's CSRF token, minting a cookie when missing.
 //
-// The cookie is deliberately readable by same-origin script. It used to be
-// HttpOnly, with the token also printed into every page — which stopped
-// working when one cached document started serving every address: a shell
-// cached on Monday would carry Monday's token and be refused on Tuesday. A
-// double-submit token is not a credential on its own (an attacker on another
-// origin can neither read this cookie nor set that header), and it was already
-// readable in the page it was printed into.
+// The cookie is deliberately readable by same-origin script: one cached
+// document serves every address, so a token printed into the page would be a
+// stale one — a shell cached on Monday carrying Monday's token, refused on
+// Tuesday. A double-submit token is not a credential on its own; an attacker
+// on another origin can neither read this cookie nor set the header that has
+// to echo it.
 func (s *server) ensureCSRF(w http.ResponseWriter, r *http.Request) string {
 	token := ""
 	if c, err := r.Cookie(csrfCookie); err == nil && len(c.Value) == 64 {
@@ -125,10 +124,9 @@ func (s *server) ensureCSRF(w http.ResponseWriter, r *http.Request) string {
 	if token == "" {
 		token = newSessionToken()
 	}
-	// Re-sent every time rather than only when missing. A browser that still
-	// holds the old HttpOnly cookie would otherwise keep it forever, and the
-	// page could never read the token it has to echo back — every sync would
-	// fail with 403 and no amount of reloading would fix it.
+	// Re-sent every time rather than only when missing, so a cookie in any
+	// wrong state — expired flags, an HttpOnly copy from some other setup —
+	// heals on the next response instead of wedging every sync at 403.
 	http.SetCookie(w, &http.Cookie{
 		Name:     csrfCookie,
 		Value:    token,

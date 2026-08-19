@@ -44,8 +44,8 @@ func main() {
 		runMailCLI(newMailer(envOr("BASE_URL", "http://"+addr)), os.Args[2:])
 		return
 	}
-	// Anything else is a mistake — very likely `user`, which used to exist.
-	// Starting the server instead would look like it had worked.
+	// Anything else is a mistake, and starting the server instead would look
+	// like it had worked.
 	if len(os.Args) > 1 {
 		log.Fatalf("unknown subcommand %q: this binary takes only `healthcheck` and `mail`.\n"+
 			"Accounts are managed with sqlite3 against %s — see the README.", os.Args[1], dbPath)
