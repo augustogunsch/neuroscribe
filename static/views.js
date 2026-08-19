@@ -113,11 +113,16 @@ async function ngViewIndex() {
 		ngEl("h1", { text: "Neuroscribe" }),
 		ngEl("p", { class: "tagline", text: ngT("Your definitive knowledge base — for any subject.") }),
 		ngEl("ul", { class: "hints" }, [
-			ngT("Create folders and notes from the sidebar."),
-			ngT("Notes are split into chapters, each written in Markdown."),
-			ngT("Write math with $…$ and $$…$$ — rendered like LaTeX."),
-			ngT("Everything is stored on this device first and works offline; the server only ever receives a sealed copy."),
-		].map(function (hint) { return ngEl("li", { text: hint }); })),
+			ngEl("li", { text: ngT("Create folders and notes from the sidebar.") }),
+			ngEl("li", { text: ngT("Notes are split into chapters, each written in Markdown.") }),
+			ngEl("li", {}, [
+				ngT("Write math with $…$ and $$…$$ — rendered like LaTeX.") + " ",
+				ngEl("a", { href: "https://katex.org/docs/supported", target: "_blank",
+					rel: "noopener noreferrer", text: ngT("Every supported function and symbol") }),
+				".",
+			]),
+			ngEl("li", { text: ngT("Everything is stored on this device first and works offline; the server only ever receives a sealed copy.") }),
+		]),
 	]);
 
 	const recent = notes.length

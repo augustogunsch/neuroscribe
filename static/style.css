@@ -275,6 +275,7 @@ body.resizing { user-select: none; cursor: col-resize; }
 .tagline { color: var(--text-dim); font-size: 1.1rem; margin-top: 0; }
 .hints { padding-left: 1.2rem; }
 .hints li { margin: 0.45rem 0; }
+.hints a { color: var(--accent); }
 
 .warn {
 	background: var(--warn-bg);

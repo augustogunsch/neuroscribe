@@ -291,6 +291,8 @@ var translations = map[string]map[string]string{
 
 		"Signing out…": "Saindo…",
 
+		"Every supported function and symbol": "Todas as funções e símbolos suportados",
+
 		// code / run
 		"Run":                "Executar",
 		"Running…":           "Executando…",
