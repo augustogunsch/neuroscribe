@@ -10,19 +10,33 @@ WebCrypto and installs the offline app with a service worker, and browsers
 allow both only in a secure context. Plain HTTP on a public host gives you
 neither sign-in nor offline mode.
 
-## 1. Build
+## 1. Build — on your machine, not the server
 
-On the server (or cross-compile and copy the binary):
+The binary is fully static (no cgo, no libc), so build where the cores are
+and copy the result:
 
 ```sh
 git clone <your-remote> neuroscribe && cd neuroscribe
-make build            # needs Go 1.26.6+
+make release          # → dist/neuroscribe-linux-amd64 (needs Go 1.26.6+)
 make assets           # ~150 MB: the browser's Python runtime + typesetter,
                       # every file verified against assets.sha256
+scp dist/neuroscribe-linux-amd64 you@server:neuroscribe
+```
+
+Do not compile on a small VPS. The pure-Go SQLite this app uses is one of the
+heaviest packages in the ecosystem to build: on one slow vCPU it takes minutes,
+and on a box with ≤1 GB of RAM the compiler is OOM-killed outright — the
+symptom is `modernc.org/libc: …/compile: signal: killed`. If you must build
+there anyway, give it swap first:
+
+```sh
+fallocate -l 2G /swapfile && chmod 600 /swapfile
+mkswap /swapfile && swapon /swapfile
 ```
 
 `make assets` is optional. Without it the app runs; Python snippets and PDF
-export report themselves unavailable.
+export report themselves unavailable. `make release` defaults to linux/amd64;
+override with `RELEASE_GOARCH=arm64` for an ARM server.
 
 ## 2. Install
 

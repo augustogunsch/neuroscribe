@@ -1,12 +1,26 @@
 BINARY  := neuroscribe
 GO      ?= go
 
-.PHONY: all build run run-open mail-dev pyodide typst vendor assets test vet fmt check hooks clean
+.PHONY: all build release run run-open mail-dev pyodide typst vendor assets test vet fmt check hooks clean
 
 all: build
 
 build:
 	$(GO) build -o $(BINARY) .
+
+# The binary is static (CGO off), so the right way to deploy to a small server
+# is to build here and copy the result: the pure-Go SQLite alone costs minutes
+# of compile time on one slow vCPU, and can swap a 1 GB machine into the
+# ground. `make release` produces dist/neuroscribe-linux-amd64 in seconds on a
+# laptop; scp it and skip compiling on the server entirely.
+RELEASE_GOOS   ?= linux
+RELEASE_GOARCH ?= amd64
+release:
+	@mkdir -p dist
+	CGO_ENABLED=0 GOOS=$(RELEASE_GOOS) GOARCH=$(RELEASE_GOARCH) \
+		$(GO) build -trimpath -ldflags="-s -w" \
+		-o dist/$(BINARY)-$(RELEASE_GOOS)-$(RELEASE_GOARCH) .
+	@ls -lh dist/$(BINARY)-$(RELEASE_GOOS)-$(RELEASE_GOARCH) | awk '{print $$5, $$9}'
 
 # .env.local (untracked) is sourced when present — see .env.example
 run: build

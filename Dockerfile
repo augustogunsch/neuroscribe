@@ -14,11 +14,15 @@ WORKDIR /src
 
 # dependencies first, so code edits do not re-download the module cache
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
 COPY . .
-# CGO stays off: modernc.org/sqlite is pure Go, so the binary is static
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/neuroscribe .
+# CGO stays off: modernc.org/sqlite is pure Go, so the binary is static.
+# The cache mounts matter more here than usual: that same pure-Go SQLite is
+# minutes of compile time, and without them every image rebuild pays it again.
+RUN --mount=type=cache,target=/go/pkg/mod \
+	--mount=type=cache,target=/root/.cache/go-build \
+	CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/neuroscribe .
 
 # ---- runtime --------------------------------------------------------------
 FROM debian:bookworm-slim AS runtime
