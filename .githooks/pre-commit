@@ -1,0 +1,18 @@
+#!/bin/sh
+# Neuroscribe pre-commit gate: formatting, static checks, unit tests.
+# Enabled via: git config core.hooksPath .githooks  (see `make hooks`)
+set -e
+
+echo "pre-commit: gofmt"
+unformatted=$(gofmt -l .)
+if [ -n "$unformatted" ]; then
+	echo "gofmt required for:"
+	echo "$unformatted"
+	exit 1
+fi
+
+echo "pre-commit: go vet"
+go vet ./...
+
+echo "pre-commit: go test"
+go test ./...

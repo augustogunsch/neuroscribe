@@ -1,0 +1,82 @@
+package main
+
+import (
+	"embed"
+	"log"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+)
+
+//go:embed templates static
+var assets embed.FS
+
+func envOr(name, def string) string {
+	if v := os.Getenv("NEUROSCRIBE_" + name); v != "" {
+		return v
+	}
+	return def
+}
+
+func main() {
+	dbPath := envOr("DB", "neuroscribe.db")
+	addr := envOr("ADDR", "127.0.0.1:8484")
+
+	db := openDB(dbPath)
+	defer db.Close()
+
+	// used as the container HEALTHCHECK, so the image ships no extra tools
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		target := addr
+		if strings.HasPrefix(target, "0.0.0.0:") {
+			target = "127.0.0.1:" + strings.TrimPrefix(target, "0.0.0.0:")
+		}
+		resp, err := (&http.Client{Timeout: 5 * time.Second}).Get("http://" + target + "/healthz")
+		if err != nil || resp.StatusCode != http.StatusOK {
+			log.Fatalf("unhealthy: %v", err)
+		}
+		resp.Body.Close()
+		return
+	}
+	// `neuroscribe mail test you@example.com` proves out SMTP settings
+	if len(os.Args) > 1 && os.Args[1] == "mail" {
+		runMailCLI(newMailer(envOr("BASE_URL", "http://"+addr)), os.Args[2:])
+		return
+	}
+	// Anything else is a mistake — very likely `user`, which used to exist.
+	// Starting the server instead would look like it had worked.
+	if len(os.Args) > 1 {
+		log.Fatalf("unknown subcommand %q: this binary takes only `healthcheck` and `mail`.\n"+
+			"Accounts are managed with sqlite3 against %s — see the README.", os.Args[1], dbPath)
+	}
+
+	srv := newServer(db, pyodideDir(), typstDir(), addr)
+	if srv.pyodideDir == "" {
+		log.Printf("warning: no Python runtime in ./pyodide — run `make pyodide` to enable python snippets")
+	} else {
+		log.Printf("serving the browser's python runtime from %s", srv.pyodideDir)
+	}
+	if srv.typstDir == "" {
+		log.Printf("warning: no typesetter in ./typst — run `make typst` to enable PDF export")
+	} else {
+		log.Printf("serving the browser's typesetter from %s", srv.typstDir)
+	}
+	switch {
+	case srv.registrationOpen():
+		log.Printf("public registration is OPEN — every account shares one workspace for now")
+	case srv.mail.configured():
+		log.Printf("mail is configured; set NEUROSCRIBE_REGISTRATION=open to allow public sign-ups")
+	}
+	var userCount int
+	db.QueryRow("SELECT count(*) FROM users").Scan(&userCount)
+	if userCount == 0 {
+		if srv.registrationOpen() {
+			log.Printf("no accounts yet — create the first one at %s/register", srv.mail.baseURL)
+		} else {
+			log.Printf("no accounts yet — configure mail and set NEUROSCRIBE_REGISTRATION=open to allow sign-up")
+		}
+	}
+	log.Printf("Neuroscribe listening on http://%s", addr)
+	log.Fatal(http.ListenAndServe(addr, srv))
+}

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Neuroscribe snippet runner</title>
+</head>
+<body>
+<!--
+  This page exists to be framed, never visited.
+
+  It is loaded into a sandboxed iframe with allow-scripts and nothing else,
+  which gives it an opaque origin: it cannot read this app's cookies, storage
+  or DOM, and requests it makes to the app are cross-origin and unauthenticated.
+  Snippets then run one step further in, inside a worker it can terminate.
+
+  Because of that isolation this document carries a looser policy than the rest
+  of the site — it needs eval and WebAssembly to host a Python interpreter — and
+  the isolation is what makes that safe to grant.
+-->
+<script src="/static/runner.js"></script>
+</body>
+</html>

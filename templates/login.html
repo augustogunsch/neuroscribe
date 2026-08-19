@@ -1,0 +1,51 @@
+{{define "layout"}}<!doctype html>
+<html lang="{{appLang}}" data-theme="{{appTheme}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{t "Sign in"}} · Neuroscribe</title>
+<link rel="icon" type="image/svg+xml" href="/static/logo.svg">
+<link rel="stylesheet" href="/static/style.css">
+<script defer src="/static/crypto.js"></script>
+<script defer src="/static/e2e.js"></script>
+</head>
+<body class="login-body">
+<div class="login-box">
+	<div class="brand login-brand"><img class="logo" src="/static/logo.svg" alt="">Neuroscribe</div>
+	{{if .Error}}<p class="warn">{{.Error}}</p>{{end}}
+	{{if .Flash}}<p class="notice">{{.Flash}}</p>{{end}}
+
+	{{if .ShowResend}}
+	<form method="post" action="/register/resend" class="login-form resend-form">
+		<input type="hidden" name="csrf_token" value="{{.CSRF}}">
+		<label class="meta-label">{{t "Email"}}
+			<input type="email" name="email" required maxlength="254" autocomplete="email">
+		</label>
+		<button type="submit">{{t "Send the link again"}}</button>
+	</form>
+	{{end}}
+
+	{{if and .NoUsers (not .Registration)}}
+	<p class="warn">{{t "There are no accounts yet and sign-up is closed on this server."}}</p>
+	<p class="page-hint">{{t "Configure mail and set this to open registration:"}}</p>
+	<pre class="cli-hint">NEUROSCRIBE_REGISTRATION=open</pre>
+	{{else}}
+	<form method="post" action="/login" class="login-form" data-e2e-login
+		data-msg-wrong="{{t "Wrong username or password."}}">
+		<input type="hidden" name="csrf_token" value="{{.CSRF}}">
+		<label class="meta-label">{{t "Username"}}
+			<input type="text" name="username" required autofocus autocomplete="username">
+		</label>
+		<label class="meta-label">{{t "Password"}}
+			<input type="password" data-e2e-password required autocomplete="current-password">
+		</label>
+		<button type="submit" class="primary">{{t "Sign in"}}</button>
+		<noscript><p class="warn">{{t "JavaScript is required: your keys are derived in the browser."}}</p></noscript>
+	</form>
+	{{if .Registration}}
+	<p class="login-alt">{{t "No account yet?"}} <a href="/register">{{t "Create one"}}</a></p>
+	{{end}}
+	{{end}}
+</div>
+</body>
+</html>{{end}}

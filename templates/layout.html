@@ -1,0 +1,74 @@
+{{define "layout"}}<!doctype html>
+<html lang="{{appLang}}" data-theme="{{appTheme}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{block "title" .}}Neuroscribe{{end}}</title>
+<script src="/static/boot.js"></script>
+<link rel="icon" type="image/svg+xml" href="/static/logo.svg">
+<link rel="stylesheet" href="/static/vendor/katex.min.css">
+<link rel="stylesheet" href="/static/chroma.css">
+<link rel="stylesheet" href="/static/style.css">
+<meta name="csrf-token" content="{{.CSRF}}">
+<script defer src="/static/vendor/katex.min.js"></script>
+<script defer src="/static/vendor/htmx.min.js"></script>
+<script defer src="/static/vendor/marked.min.js"></script>
+<script defer src="/static/vendor/purify.min.js"></script>
+<script defer src="/static/strings.js"></script>
+<script defer src="/static/crypto.js"></script>
+<script defer src="/static/zip.js"></script>
+<script defer src="/static/run.js"></script>
+<script defer src="/static/app.js"></script>
+<script defer src="/static/typst.js"></script>
+<script defer src="/static/e2e.js"></script>
+<script defer src="/static/lock.js"></script>
+</head>
+<body data-app="1" data-user="{{.Username}}"{{if .PDFOK}} data-typst="1"{{end}} data-strings="{{strings}}" hx-headers='{"X-CSRF-Token": "{{.CSRF}}"}'>
+<header class="mobile-topbar">
+	<button type="button" class="mobile-nav-btn" data-action="toggle-mobile-nav" title="Menu">☰</button>
+	<a href="/" class="mobile-brand"><img class="logo" src="/static/logo.svg" alt="">Neuroscribe</a>
+</header>
+<div class="nav-backdrop" data-action="toggle-mobile-nav"></div>
+<div class="app">
+	<aside class="sidebar" id="sidebar">
+		<button type="button" class="sidebar-toggle" data-action="toggle-sidebar" title="{{t "Collapse sidebar"}}">⟨</button>
+		<div class="brand"><a href="/"><img class="logo" src="/static/logo.svg" alt="">Neuroscribe</a></div>
+		<div class="sidebar-actions">
+			<button type="button" data-action="new-note" data-id="" data-prompt="{{t "Note title"}}">{{t "+ Note"}}</button>
+			<button type="button" data-action="new-dir" data-id="" data-prompt="{{t "Folder name"}}">{{t "+ Folder"}}</button>
+		</div>
+		<nav class="treewrap">
+			{{template "tree" .}}
+		</nav>
+		<div class="sidebar-footer">
+			<a href="/settings">⚙ {{t "Settings"}}</a>
+			<a href="/trash">🗑 {{t "Trash"}}</a>
+			{{if .Username}}
+			<form method="post" action="/logout" class="inline-form logout-form">
+				<input type="hidden" name="csrf_token" value="{{.CSRF}}">
+				<span class="whoami">{{.Username}}</span>
+				<button type="submit" class="linklike">{{t "Log out"}}</button>
+			</form>
+			{{end}}
+		</div>
+	</aside>
+	<div class="sidebar-resizer" id="sidebar-resizer" title="{{t "Drag to resize"}}"></div>
+	<main class="content">
+		{{if .Flash}}<div class="warn flash" role="alert">{{.Flash}} <button type="button" class="flash-close" data-action="dismiss-flash">✕</button></div>{{end}}
+		{{block "main" .}}{{end}}
+	</main>
+</div>
+
+<dialog class="modal" id="app-dialog">
+	<form method="dialog">
+		<h3 id="app-dialog-title"></h3>
+		<input id="app-dialog-input" type="text" maxlength="200" autocomplete="off">
+		<div class="edit-actions modal-actions">
+			<button type="submit" class="primary" value="ok" id="app-dialog-ok">OK</button>
+			<button type="button" value="cancel" data-dialog-cancel>{{t "Cancel"}}</button>
+		</div>
+	</form>
+</dialog>
+<div id="toasts"></div>
+</body>
+</html>{{end}}

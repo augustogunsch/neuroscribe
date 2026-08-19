@@ -1,0 +1,104 @@
+{{define "layout"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Neuroscribe</title>
+
+<!--
+	One document for every address in the app.
+
+	There is nothing in here about any note, and that is the point: this page
+	is cached by the service worker and answers every navigation, so a reader
+	with no connection gets the same app as one with. What fills it comes from
+	IndexedDB, which is also where writing goes; the server sees the result
+	later, sealed, when there is a network again.
+-->
+
+<script src="/static/boot.js"></script>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#17171c">
+<link rel="icon" type="image/svg+xml" href="/static/logo.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Neuroscribe">
+
+<link rel="stylesheet" href="/static/vendor/katex.min.css">
+<link rel="stylesheet" href="/static/chroma.css">
+<link rel="stylesheet" href="/static/style.css">
+
+<script defer src="/static/vendor/katex.min.js"></script>
+<script defer src="/static/vendor/marked.min.js"></script>
+<script defer src="/static/vendor/purify.min.js"></script>
+<script defer src="/static/strings.js"></script>
+<script defer src="/static/crypto.js"></script>
+<script defer src="/static/strength.js"></script>
+<script defer src="/static/store.js"></script>
+<script defer src="/static/sync.js"></script>
+<script defer src="/static/model.js"></script>
+<script defer src="/static/zip.js"></script>
+<script defer src="/static/run.js"></script>
+<script defer src="/static/app.js"></script>
+<script defer src="/static/render.js"></script>
+<script defer src="/static/views.js"></script>
+<script defer src="/static/settings.js"></script>
+<script defer src="/static/export.js"></script>
+<script defer src="/static/typst.js"></script>
+<script defer src="/static/router.js"></script>
+<script defer src="/static/lock.js"></script>
+</head>
+
+<body data-app="1" data-user="{{.Username}}"
+	{{if .RunnerOK}}data-runner="1"{{end}}{{if .PDFOK}} data-typst="1"{{end}}>
+
+<header class="mobile-topbar">
+	<button type="button" class="mobile-nav-btn" data-action="toggle-mobile-nav" title="Menu">☰</button>
+	<a href="/" class="mobile-brand" data-link><img class="logo" src="/static/logo.svg" alt="">Neuroscribe</a>
+</header>
+<div class="nav-backdrop" data-action="toggle-mobile-nav"></div>
+
+<div class="app">
+	<aside class="sidebar" id="sidebar">
+		<button type="button" class="sidebar-toggle" data-action="toggle-sidebar" title="Collapse sidebar">⟨</button>
+		<div class="brand"><a href="/" data-link><img class="logo" src="/static/logo.svg" alt="">Neuroscribe</a></div>
+		<div class="sidebar-actions">
+			<button type="button" data-action="new-note" data-id="">+ Note</button>
+			<button type="button" data-action="new-dir" data-id="">+ Folder</button>
+		</div>
+		<nav class="treewrap" data-tree></nav>
+		<div class="sidebar-footer">
+			<a href="/settings" data-link>⚙ <span data-t="Settings">Settings</span></a>
+			<a href="/trash" data-link>🗑 <span data-t="Trash">Trash</span></a>
+			<div class="sync-status" data-sync-status></div>
+			{{if .Username}}
+			<form method="post" action="/logout" class="inline-form logout-form">
+				<span class="whoami">{{.Username}}</span>
+				<button type="submit" class="linklike" data-t="Log out">Log out</button>
+			</form>
+			{{end}}
+		</div>
+	</aside>
+
+	<div class="sidebar-resizer" id="sidebar-resizer" title="Drag to resize"></div>
+	<main class="content" data-view></main>
+</div>
+
+<!-- one dialog for every prompt and confirmation; showModal() gives it a
+     real backdrop and focus trap, which a floating div never quite fakes -->
+<dialog class="modal" id="app-dialog">
+	<form method="dialog">
+		<h3 id="app-dialog-title"></h3>
+		<input id="app-dialog-input" type="text" maxlength="200" autocomplete="off">
+		<div class="edit-actions modal-actions">
+			<button type="submit" class="primary" value="ok" id="app-dialog-ok">OK</button>
+			<button type="button" value="cancel" id="app-dialog-cancel">Cancel</button>
+		</div>
+	</form>
+</dialog>
+<div id="toasts"></div>
+
+<noscript>
+	<p class="warn">Neuroscribe needs JavaScript: your notes are decrypted in this browser,
+	and the server has no readable copy of them.</p>
+</noscript>
+</body>
+</html>{{end}}

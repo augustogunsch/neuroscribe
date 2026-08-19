@@ -1,0 +1,67 @@
+{{define "layout"}}<!doctype html>
+<html lang="{{appLang}}" data-theme="{{appTheme}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{t "Create an account"}} · Neuroscribe</title>
+<link rel="icon" type="image/svg+xml" href="/static/logo.svg">
+<link rel="stylesheet" href="/static/style.css">
+<script type="module" src="/static/vendor/altcha.min.js"></script>
+<script defer src="/static/strings.js"></script>
+<script defer src="/static/crypto.js"></script>
+<script defer src="/static/strength.js"></script>
+<script defer src="/static/e2e.js"></script>
+</head>
+<body class="login-body" data-strings="{{strings}}">
+<div class="login-box register-box">
+	<div class="brand login-brand"><img class="logo" src="/static/logo.svg" alt="">Neuroscribe</div>
+
+	{{if .Error}}<p class="warn">{{.Error}}</p>{{end}}
+
+	{{if .Done}}
+		{{if .Notice}}
+		<p class="notice">{{.Notice}}</p>
+		<p class="page-hint">{{t "The link is valid for 24 hours. Remember to look in your spam folder."}}</p>
+		{{end}}
+		<p class="login-alt"><a href="/login">{{t "Back to sign in"}}</a></p>
+	{{else}}
+	<form method="post" action="/register" class="login-form" data-e2e-register
+		data-msg-mismatch="{{t "The two passwords do not match."}}"
+		data-msg-weak="{{t "Choose a stronger password before continuing."}}">
+		<input type="hidden" name="csrf_token" value="{{.CSRF}}">
+		<input type="hidden" name="kdf_salt" value="">
+		<input type="hidden" name="auth_key" value="">
+		<input type="hidden" name="wrapped_key" value="">
+		<label class="meta-label">{{t "Username"}}
+			<input type="text" name="username" value="{{.Username}}" required autofocus
+				autocomplete="username" minlength="3" maxlength="32" pattern="[a-zA-Z0-9][a-zA-Z0-9_.\-]{2,31}">
+		</label>
+		<label class="meta-label">{{t "Email"}}
+			<input type="email" name="email" value="{{.Email}}" required autocomplete="email" maxlength="254">
+		</label>
+		<label class="meta-label">{{t "Password"}}
+			<input type="password" data-e2e-password required autocomplete="new-password"
+				minlength="12" maxlength="256">
+		</label>
+		<div class="pw-meter" data-pw-meter></div>
+		<p class="page-hint">{{t "Length is what matters, not punctuation. Four or five unrelated words make a password that is easy to remember and slow to guess; a short one with symbols in it is neither."}}</p>
+		<label class="meta-label">{{t "Confirm password"}}
+			<input type="password" data-e2e-password-confirm required autocomplete="new-password"
+				minlength="12" maxlength="256">
+		</label>
+		<p class="warn slim">{{t "What you write is encrypted with this password before it leaves your device. There is no recovery: if you lose the password, the writing is unreadable forever."}}</p>
+		<p class="page-hint">{{t "Titles, folders, images and metadata are encrypted too. The server can see how much you have written and when, but not what it says."}}</p>
+		<noscript><p class="warn">{{t "JavaScript is required: your keys are derived in the browser."}}</p></noscript>
+		<altcha-widget
+			challengeurl="/altcha/challenge"
+			name="altcha"
+			{{if ne appTheme "auto"}}theme="{{appTheme}}"{{end}}
+			strings='{"label":"{{t "I am not a robot"}}","verifying":"{{t "Verifying…"}}","verified":"{{t "Verified"}}","error":"{{t "Verification failed"}}"}'
+		></altcha-widget>
+		<button type="submit" class="primary">{{t "Create account"}}</button>
+	</form>
+	<p class="login-alt">{{t "Already have an account?"}} <a href="/login">{{t "Sign in"}}</a></p>
+	{{end}}
+</div>
+</body>
+</html>{{end}}

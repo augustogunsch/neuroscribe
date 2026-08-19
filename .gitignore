@@ -1,0 +1,8 @@
+/neuroscribe
+neuroscribe.db
+neuroscribe.db-*
+.playwright-mcp/
+.env.local
+backups/
+/pyodide/
+/typst/

@@ -1,0 +1,68 @@
+# Hardened deployment. The app runs unprivileged, with a read-only root
+# filesystem and no route to the host's Docker daemon: a compromise inside the
+# container is confined to the container and its /data volume.
+#
+#   docker compose up -d --build
+#
+# Snippets run in the browser, so this container has no container runtime, no
+# daemon socket and no interpreter to reach. Run `make assets` on the host
+# first and the Python runtime is mounted in read-only below; skip it and
+# Python snippets report themselves unavailable while JavaScript still runs.
+#
+# Put NEUROSCRIBE_SMTP_*, MAIL_FROM, BASE_URL, ALLOWED_HOSTS and REGISTRATION
+# in .env.local; it is read below and never baked into the image.
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        WITH_LATEX: "1"
+    image: neuroscribe:latest
+    restart: unless-stopped
+    env_file:
+      - path: .env.local
+        required: false
+    environment:
+      NEUROSCRIBE_ADDR: 0.0.0.0:8484
+      NEUROSCRIBE_DB: /data/neuroscribe.db
+      # the container cannot know which hostname it is served under
+      NEUROSCRIBE_ALLOWED_HOSTS: ${NEUROSCRIBE_ALLOWED_HOSTS:-localhost,127.0.0.1}
+    # bound to loopback: put a TLS-terminating proxy in front of it
+    ports:
+      - "127.0.0.1:8484:8484"
+    volumes:
+      - data:/data
+      # the browser's Python runtime and typesetter: static files, read-only,
+      # no user data
+      - ./pyodide:/opt/pyodide:ro
+      - ./typst:/opt/typst:ro
+
+    # ---- containment ----
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      # only multipart uploads need scratch space now that no note is ever
+      # written to disk in the clear; noexec keeps a dropped payload from
+      # being executed out of it
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    mem_limit: 1g
+    cpus: 1.5
+
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/neuroscribe", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks: [front]
+
+networks:
+  front:
+
+volumes:
+  data:

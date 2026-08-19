@@ -1,0 +1,87 @@
+{{define "layout"}}<!doctype html>
+<html lang="{{appLang}}" data-theme="{{appTheme}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neuroscribe: {{t "An offline-first, encrypted knowledge base for Markdown, mathematics and runnable code."}}</title>
+<meta name="description" content="{{t "An offline-first, encrypted knowledge base for Markdown, mathematics and runnable code."}}">
+<link rel="icon" type="image/svg+xml" href="/static/logo.svg">
+<link rel="stylesheet" href="/static/vendor/katex.min.css">
+<link rel="stylesheet" href="/static/style.css">
+<script defer src="/static/vendor/katex.min.js"></script>
+<script defer src="/static/landing.js"></script>
+</head>
+<body class="landing-body">
+<div class="landing-glow" aria-hidden="true"></div>
+
+<header class="landing-nav">
+	<a class="brand landing-brand" href="/"><img class="logo" src="/static/logo.svg" alt="">Neuroscribe</a>
+	<nav class="landing-actions">
+		<a class="btn" href="/login">{{t "Sign in"}}</a>
+		{{if .Registration}}<a class="btn primary" href="/register">{{t "Create account"}}</a>{{end}}
+	</nav>
+</header>
+
+<main class="landing">
+	<section class="landing-hero">
+		<h1>{{t "Your knowledge base. Offline, encrypted, yours."}}</h1>
+		<p class="tagline">{{t "Markdown notes with LaTeX-grade mathematics and runnable code. It installs like an app, works with no connection, and encrypts everything in your browser, free and open source."}}</p>
+		<div class="landing-cta">
+			{{if .Registration}}
+			<a class="btn primary big" href="/register">{{t "Create account"}}</a>
+			<a class="btn big" href="/login">{{t "Sign in"}}</a>
+			{{else}}
+			<a class="btn primary big" href="/login">{{t "Sign in"}}</a>
+			<p class="page-hint">{{t "Sign-ups are closed on this server."}}</p>
+			{{end}}
+		</div>
+	</section>
+
+	<!-- a small, honest picture of the thing itself -->
+	<section class="shot" aria-hidden="true">
+		<div class="shot-bar"><span></span><span></span><span></span></div>
+		<div class="shot-body">
+			<aside class="shot-side">
+				<p class="shot-folder">▾ Physics</p>
+				<p class="shot-note is-active">Quantum Mechanics</p>
+				<p class="shot-note">Waves</p>
+				<p class="shot-folder">▾ Mathematics</p>
+				<p class="shot-note">Álgebra Linear</p>
+			</aside>
+			<div class="shot-main">
+				<p class="shot-crumb">Quantum Mechanics <span>/</span> Chapter 2 of 5</p>
+				<h3>Operators</h3>
+				<p class="shot-text">{{t "The eigenvalue problem for an observable reads"}}</p>
+				<div class="shot-math" data-tex="\hat{H}\psi_n = E_n \psi_n"></div>
+				<div class="shot-code">
+					<div class="shot-code-head"><span>PYTHON</span><span class="shot-run">▶ Run</span></div>
+					<pre><span class="k">import</span> numpy <span class="k">as</span> np
+w, v = np.linalg.eigh(H)</pre>
+					<div class="shot-out">eigenvalues: [-13.6  -3.4  -1.5]</div>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<section class="landing-points">
+		<p><strong>{{t "Works offline."}}</strong> {{t "Install it like an app and keep writing with no connection; your notes sync across your devices once you are back online."}}</p>
+		<p><strong>{{t "Markdown, mathematics and code."}}</strong> {{t "Write in Markdown, typeset numbered equations like LaTeX, and run Python and JavaScript (numpy, scipy, sympy and pandas) right in the page."}}</p>
+		<p><strong>{{t "Free and open source."}}</strong> {{t "Licensed under the GNU GPL v3, read it, audit it, or run your own server."}}</p>
+		<p><strong>{{t "Nothing locked in."}}</strong> {{t "Export a typeset PDF, or the whole base as Markdown."}}</p>
+	</section>
+
+	<section class="landing-next">
+		<h2>{{t "End-to-end encryption"}}</h2>
+		<p>{{t "What you write is encrypted in your browser with a key derived from your password. Everything that syncs between your devices, and everything the server stores, is ciphertext it has no key for. The trade-off is absolute: there is no password reset and no recovery, lose the password and the writing is gone."}}</p>
+		<p class="landing-next-status">{{t "Titles, folder names, images and metadata are encrypted with the same key. The server can see how much you have written and when, but not what any of it says."}}</p>
+	</section>
+</main>
+
+<footer class="landing-footer">
+	<p>
+		Neuroscribe, {{t "free software under the GNU GPL v3."}}
+		<span class="landing-by">{{t "by"}} <a href="https://augustogunsch.com" rel="me noopener">Augusto Gunsch</a></span>
+	</p>
+</footer>
+</body>
+</html>{{end}}

@@ -1,0 +1,8 @@
+.git
+.githooks
+.playwright-mcp
+*.db
+*.db-*
+.env.local
+neuroscribe
+*.png
