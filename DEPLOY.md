@@ -176,7 +176,12 @@ over plain HTTP, and `certbot renew` reuses whichever method issued the
 certificate. The supplied config already carries the pieces that matter: `Host` and
 `X-Forwarded-Proto` forwarded (host allowlisting and Secure cookies depend on
 them), rate limits on sign-in and sign-up, `sw.js` never cached, sync bodies
-kept off nginx's disk. It coexists with other sites on the same nginx: it
+kept off nginx's disk.
+
+If the site answers **"unrecognized Host header"**, everything is connected
+and the app is rejecting the domain: `NEUROSCRIBE_ALLOWED_HOSTS` in `.env`
+must be exactly the bare hostname (`notes.example.com` — no scheme, no port),
+and the app only rereads `.env` on restart. It coexists with other sites on the same nginx: it
 claims only its own `server_name`, and its rate-limit zones carry the `ng_`
 prefix so they cannot collide with zones your other configs define.
 
