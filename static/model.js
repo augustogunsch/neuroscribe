@@ -72,19 +72,21 @@ async function ngOpenBody(ref) {
 
 /* ---- loading ---- */
 
+// The reload builds into fresh maps and swaps them in at the end. Decrypting
+// every header takes real time, and clearing the live maps first would leave a
+// window where any render — a sync pull triggers them — sees a half-empty
+// account: chapters missing, moves misfiring, lists flickering.
 async function ngLoadModel() {
 	if (ngLocked()) return ngModel;
-	const buckets = {
-		dir: ngModel.dirs, note: ngModel.notes, chapter: ngModel.chapters,
-		type: ngModel.types, image: ngModel.images,
+	const fresh = {
+		dir: new Map(), note: new Map(), chapter: new Map(),
+		type: new Map(), image: new Map(),
 	};
-	Object.values(buckets).forEach(function (m) { m.clear(); });
-
-	for (const kind of Object.keys(buckets)) {
+	for (const kind of Object.keys(fresh)) {
 		for (const rec of await ngAllOfKind(kind)) {
 			const header = await ngOpenHeader(rec);
 			if (!header) continue;
-			buckets[kind].set(rec.ref, Object.assign({
+			fresh[kind].set(rec.ref, Object.assign({
 				ref: rec.ref,
 				rev: rec.rev,
 				dirty: !!rec.dirty,
@@ -93,6 +95,11 @@ async function ngLoadModel() {
 			}, header));
 		}
 	}
+	ngModel.dirs = fresh.dir;
+	ngModel.notes = fresh.note;
+	ngModel.chapters = fresh.chapter;
+	ngModel.types = fresh.type;
+	ngModel.images = fresh.image;
 	ngModel.loaded = true;
 	return ngModel;
 }
@@ -126,7 +133,11 @@ function ngChaptersOf(noteRef) {
 	ngModel.chapters.forEach(function (c) {
 		if (c.note === noteRef) out.push(c);
 	});
-	return out.sort(function (a, b) { return (a.pos || 0) - (b.pos || 0); });
+	// the ref tiebreak matters: records that ever carried equal pos values
+	// would otherwise sort differently from one render to the next
+	return out.sort(function (a, b) {
+		return ((a.pos || 0) - (b.pos || 0)) || String(a.ref).localeCompare(String(b.ref));
+	});
 }
 
 function ngImagesOf(noteRef) {
@@ -262,6 +273,9 @@ async function ngRenumber(noteRef) {
 	}
 }
 
+// Moving renumbers the whole list rather than swapping two values: swapping
+// assumes every pos is already unique, and any pair that ever ended up equal
+// would make the swap a visual no-op forever. Renumbering heals as it goes.
 async function ngMoveChapter(ref, direction) {
 	const chapter = ngModel.chapters.get(ref);
 	if (!chapter) return;
@@ -269,9 +283,12 @@ async function ngMoveChapter(ref, direction) {
 	const at = chapters.findIndex(function (c) { return c.ref === ref; });
 	const to = direction === "up" ? at - 1 : at + 1;
 	if (to < 0 || to >= chapters.length) return;
-	const other = chapters[to];
-	await ngUpdate("chapter", ref, { pos: other.pos });
-	await ngUpdate("chapter", other.ref, { pos: chapter.pos });
+	const order = chapters.slice();
+	order.splice(at, 1);
+	order.splice(to, 0, chapter);
+	for (let i = 0; i < order.length; i++) {
+		if (order[i].pos !== i + 1) await ngUpdate("chapter", order[i].ref, { pos: i + 1 });
+	}
 }
 
 /* ---- what a new account starts with ---- */

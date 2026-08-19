@@ -99,6 +99,10 @@ async function ngSync() {
 async function ngPush() {
 	let dirty = await ngDirtyRecords(NG_SYNC_BATCH);
 	while (dirty.length) {
+		// what each record looked like when it left: the lw counter lets the
+		// reply distinguish "confirmed as sent" from "edited again meanwhile"
+		const sentLw = {};
+		dirty.forEach(function (rec) { sentLw[rec.ref] = rec.lw; });
 		const body = {
 			records: dirty.map(function (rec) {
 				return {
@@ -120,7 +124,7 @@ async function ngPush() {
 		const result = await resp.json();
 
 		for (const rec of result.applied) {
-			await ngMarkClean(rec.ref, rec.rev, rec.seq);
+			await ngMarkClean(rec.ref, rec.rev, rec.seq, sentLw[rec.ref]);
 		}
 		for (const remote of result.conflicts) {
 			await ngResolveConflict(remote);
@@ -128,7 +132,7 @@ async function ngPush() {
 		for (const bad of result.rejected) {
 			// Refused for a reason that will not change by retrying — a plan
 			// limit, an oversized record. Stop calling it dirty, and say so.
-			await ngMarkClean(bad.ref, 0, 0);
+			await ngMarkClean(bad.ref, 0, 0, sentLw[bad.ref]);
 			ngLastError = bad.reason;
 		}
 		if (!result.applied.length && !result.conflicts.length) break;
@@ -136,16 +140,34 @@ async function ngPush() {
 	}
 }
 
-// ngResolveConflict keeps both sides. The server's version takes the address,
-// because that is what every other device already agrees on; the local edit
-// becomes a new record next to it, flagged so the interface can point at it.
+// ngResolveConflict decides what a refused write becomes. The cases matter:
+//
+//   local tombstone   the person deleted this; the delete is the intent and
+//                     must not be resurrected by the server's live copy. It
+//                     adopts the server's revision as its new base and goes
+//                     out again next round, where it will be accepted.
+//   same payload      both sides already agree; take the server's bookkeeping.
+//   both alive,       a genuine two-device conflict: the server's version
+//   different text    keeps the address, the local edit is preserved as a new
+//                     record beside it — nothing is discarded silently.
 async function ngResolveConflict(remote) {
 	const local = await ngGetAny(remote.ref);
-	if (local && !remote.deleted && local.payload && local.payload !== remote.payload) {
-		await ngCreate(local.kind, local.parent, local.payload).then(function (copy) {
-			copy.conflict_of = remote.ref;
-			return ngPut(copy);
-		});
+	if (!local) {
+		await ngApplyRemoteForce(remote);
+		return;
+	}
+	if (local.deleted && !remote.deleted) {
+		await ngAdoptRev(remote.ref, remote.rev, remote.seq);
+		return;
+	}
+	if (!local.deleted && !remote.deleted && local.payload === remote.payload) {
+		await ngApplyRemoteForce(remote);
+		return;
+	}
+	if (!remote.deleted && local.payload && local.payload !== remote.payload) {
+		const copy = await ngCreate(local.kind, local.parent, local.payload);
+		copy.conflict_of = remote.ref;
+		await ngPut(copy);
 	}
 	await ngApplyRemoteForce(remote);
 }

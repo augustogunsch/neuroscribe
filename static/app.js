@@ -210,7 +210,10 @@ function mdAction(action, toolbar) {
 		case "code": mdWrap(ta, "`", "`", "code"); break;
 		case "math": mdWrap(ta, "$", "$", "x^2"); break;
 		case "link": mdWrap(ta, "[", "](https://)", "text"); break;
-		case "heading": mdLinePrefix(ta, "## "); break;
+		// ### rather than ##: the chapter title is the page's h1 and rendered
+		// Markdown starts one level below it, so an inserted heading should
+		// sit under the title, not compete with it
+		case "heading": mdLinePrefix(ta, "### "); break;
 		case "list": mdLinePrefix(ta, "- "); break;
 		case "quote": mdLinePrefix(ta, "> "); break;
 		case "codeblock": mdInsertBlock(ta, "```python\n\n```\n"); break;

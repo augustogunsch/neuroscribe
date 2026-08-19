@@ -119,14 +119,34 @@ async function ngChildrenOf(parent, kind) {
  * needs in order to tell whether this edit was based on current information.
  */
 
+// ngPut stores the caller's *content* — payload, parent, kind, deleted — but
+// never its bookkeeping. rev and seq are what the server last confirmed and
+// may have advanced while the caller held its copy (a sync reply landing
+// mid-edit); trusting the caller's stale values made the next push carry the
+// wrong base revision, which the server can only read as a conflict, which
+// duplicated the record. The read-modify-write happens inside one IndexedDB
+// transaction, so nothing can interleave. lw is a per-record local-write
+// counter: the proof ngMarkClean needs that no newer edit landed meanwhile.
 async function ngPut(rec) {
-	rec.updated_at = ngNow();
-	rec.dirty = 1;
-	rec.parent = rec.parent || "";
 	const tx = await ngTx(["records"], "readwrite");
-	await ngReq(tx.objectStore("records").put(rec));
+	const store = tx.objectStore("records");
+	const current = await ngReq(store.get(rec.ref));
+	const stored = {
+		ref: rec.ref,
+		kind: rec.kind,
+		parent: rec.parent || "",
+		payload: rec.payload || "",
+		deleted: rec.deleted ? 1 : 0,
+		conflict_of: rec.conflict_of || (current && current.conflict_of) || "",
+		rev: current ? current.rev : 0,
+		seq: current ? current.seq : 0,
+		lw: ((current && current.lw) || 0) + 1,
+		updated_at: ngNow(),
+		dirty: 1,
+	};
+	await ngReq(store.put(stored));
 	ngNudgeSync();
-	return rec;
+	return stored;
 }
 
 async function ngCreate(kind, parent, payload) {
@@ -184,15 +204,33 @@ async function ngApplyRemote(remote) {
 }
 
 // ngMarkClean records what the server accepted: the new rev is now the base
-// for the next edit.
-async function ngMarkClean(ref, rev, seq) {
+// for the next edit. dirty is cleared only when nothing was written locally
+// since the push left (the lw counter proves it) — an edit saved while the
+// push was airborne stays dirty and goes out on the next round, against the
+// corrected base, instead of being stranded and then reverted by a pull.
+async function ngMarkClean(ref, rev, seq, lwAtPush) {
 	const tx = await ngTx(["records"], "readwrite");
 	const store = tx.objectStore("records");
 	const rec = await ngReq(store.get(ref));
 	if (!rec) return;
 	rec.rev = rev;
 	rec.seq = seq;
-	rec.dirty = 0;
+	if (lwAtPush === undefined || rec.lw === lwAtPush) {
+		rec.dirty = 0;
+	}
+	await ngReq(store.put(rec));
+}
+
+// ngAdoptRev takes the server's revision as the new base without touching
+// the content or the dirty flag — how a losing tombstone keeps its intent
+// while gaining a base the server will accept.
+async function ngAdoptRev(ref, rev, seq) {
+	const tx = await ngTx(["records"], "readwrite");
+	const store = tx.objectStore("records");
+	const rec = await ngReq(store.get(ref));
+	if (!rec) return;
+	rec.rev = rev;
+	rec.seq = seq;
 	await ngReq(store.put(rec));
 }
 
