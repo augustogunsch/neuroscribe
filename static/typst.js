@@ -129,7 +129,8 @@ function ngTypstRenderer(ctx) {
 		switch (t.type) {
 			case "text":
 			case "escape":
-				return withMath(t.tokens && t.tokens.length ? inlines(t.tokens) : ngTypstProse(t.text), t);
+				return withMath(t.tokens && t.tokens.length
+					? inlines(t.tokens) : ngTypstProse(ngUnescapeEntities(t.text)), t);
 			case "strong":
 				return "#strong[" + inlines(t.tokens) + "]";
 			case "em":
@@ -147,7 +148,7 @@ function ngTypstRenderer(ctx) {
 			case "html":
 				return ""; // raw HTML is dropped, as it was under LaTeX
 			default:
-				return t.tokens ? inlines(t.tokens) : ngTypstText(t.text || t.raw || "");
+				return t.tokens ? inlines(t.tokens) : ngTypstText(ngUnescapeEntities(t.text || t.raw || ""));
 		}
 	}
 
@@ -165,7 +166,10 @@ function ngTypstRenderer(ctx) {
 
 	function image(t) {
 		const name = ctx.embed(t.href);
-		if (!name) return "#emph[" + ngTypstText("[image: " + (t.text || t.href || "") + "]") + "]";
+		if (!name) {
+			return "#emph[" + ngTypstText("[image: " +
+				(ngUnescapeEntities(t.text) || t.href || "") + "]") + "]";
+		}
 		return "#align(center, image(" + ngTypstStr(name) + "))";
 	}
 
@@ -189,7 +193,7 @@ function ngTypstRenderer(ctx) {
 				out.push(inlines(t.tokens) + "\n");
 				return;
 			case "text":
-				out.push(t.tokens ? inlines(t.tokens) : ngTypstText(t.text));
+				out.push(t.tokens ? inlines(t.tokens) : ngTypstText(ngUnescapeEntities(t.text)));
 				return;
 			case "blockquote": {
 				const inner = ngTypstRenderer(ctx);
@@ -252,7 +256,11 @@ function ngTypstRenderer(ctx) {
 	};
 }
 
-// marked resolves entities in code spans; the PDF wants the characters back.
+// marked HTML-escapes the text it hands back — an apostrophe arrives as
+// &#39; — because its own output is HTML. Typst is not HTML, so every piece of
+// marked-derived text is turned back into characters before it is escaped for
+// Typst. Only text that came through marked: a note title or a field value is
+// the author's own bytes, and a literal &amp; in one must survive as it was.
 function ngUnescapeEntities(s) {
 	return String(s || "").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
 		.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
