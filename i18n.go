@@ -391,7 +391,9 @@ var translations = map[string]map[string]string{
 		// landing page
 		"Everything you know, written down properly.": "Tudo o que você sabe, escrito como deve ser.",
 		"Sign-ups are closed on this server.":         "Os cadastros estão fechados neste servidor.",
-		"Notes with structure":                        "Notas com estrutura",
+		"Download for Android":                        "Baixar para Android",
+		"Not on the Play Store: it is an APK you install yourself, and it updates only when you install a new one. Your phone will ask you to allow it.": "Não está na Play Store: é um APK que você mesmo instala, e ele só se atualiza quando você instala um novo. Seu celular vai pedir sua permissão.",
+		"Notes with structure": "Notas com estrutura",
 		"Organize notes in folders and split each one into chapters you can write, reorder and read separately.": "Organize notas em pastas e divida cada uma em capítulos que você escreve, reordena e lê separadamente.",
 		"Markdown and mathematics": "Markdown e matemática",
 		"Write in Markdown, typeset formulas like LaTeX, number equations and reference them across a note.": "Escreva em Markdown, componha fórmulas como no LaTeX, numere equações e referencie-as ao longo da nota.",

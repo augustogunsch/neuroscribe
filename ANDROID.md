@@ -89,6 +89,34 @@ cd android && gradle wrapper --gradle-version 8.7
 the debug key Android generates. It cannot be upgraded to a release build in
 place — different signature — so it is for trying things, not for keeping.
 
+### Building in a container
+
+Works, with one catch worth knowing before you lose an afternoon to it: Google
+ships `aapt2` only for linux-x86_64, so an **arm64 container cannot build at
+all**. On an Apple Silicon machine the failure is a wall of
+
+```
+AAPT2 aapt2-…-linux Daemon #1: Daemon startup failed
+This should not happen under normal circumstances, please file an issue if it does.
+```
+
+which says nothing about architecture. Pass `--platform linux/amd64` and it
+builds under emulation:
+
+```sh
+docker run --rm --platform linux/amd64 \
+  -v ng-sdk:/sdk -v ng-gradle:/home/gradle/.gradle \
+  -v "$PWD":/w -w /w/android gradle:8.7-jdk17 sh -c '
+    export ANDROID_HOME=/sdk PATH=/sdk/cmdline-tools/latest/bin:$PATH
+    …install cmdline-tools, accept licences, sdkmanager platforms;android-34…
+    gradle --no-daemon assembleDebug'
+```
+
+The named volumes matter: without them every run re-downloads the SDK.
+
+Natively on macOS there is no such problem — `aapt2` ships for darwin — so a
+local Android SDK is the faster path if you have one.
+
 ## What is frozen and what is not
 
 Frozen, from the APK:
