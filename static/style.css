@@ -1209,3 +1209,30 @@ body.is-locked { overflow: hidden; }
 
 .danger-zone { border-color: var(--danger); }
 .danger-zone h2 { color: var(--danger); }
+
+/* the list of devices this account has a PIN on */
+.pin-devices {
+	list-style: none;
+	margin: 0 0 0.6rem;
+	padding: 0;
+}
+
+.pin-devices li {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	padding: 0.35rem 0;
+	border-bottom: 1px solid var(--line);
+	font-size: 0.94rem;
+}
+
+.pin-devices li:last-child {
+	border-bottom: 0;
+}
+
+.pin-devices-title {
+	margin: 1.1rem 0 0.3rem;
+	font-size: 0.95rem;
+	font-weight: 600;
+}

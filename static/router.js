@@ -384,7 +384,11 @@ function ngWireGlobalActions() {
 	});
 
 	window.addEventListener("popstate", ngRender);
-	ngOnData(function () { ngLoadModel().then(ngRender); });
+	ngOnData(function () {
+		ngLoadModel().then(ngRender);
+		// a pin record can arrive on any pull, not only the first
+		if (typeof ngRestorePin === "function") ngRestorePin();
+	});
 }
 
 /* ---- boot ---- */
@@ -415,6 +419,10 @@ async function ngBootApp() {
 		await ngSeedDefaults();
 		await ngRender();
 	}
+	// After the first pull, because the record that arms this device's lock may
+	// only just have arrived with it — a device signing in fresh, or one whose
+	// storage was cleared, learns its own PIN from the account here.
+	if (typeof ngRestorePin === "function") await ngRestorePin();
 }
 
 document.addEventListener("DOMContentLoaded", ngBootApp);

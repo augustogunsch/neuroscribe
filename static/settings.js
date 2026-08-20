@@ -306,7 +306,7 @@ function ngPinCard() {
 	}));
 	return ngEl("section", { class: "type-card", "data-pin-settings": true, hidden: true }, [
 		ngEl("h2", { text: ngT("Device PIN") }),
-		ngEl("p", { class: "page-hint", text: ngT("A six-digit PIN unlocks this browser instead of your full password. It is stored nowhere: what is kept on this device is your key sealed with the PIN, and it never reaches the server.") }),
+		ngEl("p", { class: "page-hint", text: ngT("A six-digit PIN unlocks this device instead of your full password. The PIN travels with your notes, sealed with your key, so signing in again brings this device's lock back — the server holds it and cannot read it. The key sealed under the PIN never leaves this device.") }),
 		ngEl("dl", { class: "meta-fields" }, [
 			ngEl("div", { class: "meta-field" }, [
 				ngEl("dt", { text: ngT("Status") }),
@@ -334,6 +334,7 @@ function ngPinCard() {
 				ngEl("button", { type: "button", class: "danger", "data-pin-remove": true, hidden: true, text: ngT("Remove PIN") }),
 			]),
 		]),
+		ngEl("div", { "data-pin-devices": true }),
 		ngEl("p", { class: "page-hint pin-note", text: ngT("Six digits is a million combinations: enough to stop someone who picks up your unlocked laptop, not enough to stop someone who copies this browser's storage and guesses at their leisure. Ten wrong tries erase the sealed key from this device, and your password still gets you back in.") }),
 	]);
 }
