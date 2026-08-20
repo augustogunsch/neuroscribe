@@ -48,6 +48,8 @@ const NG_PRECACHE = [
 	"/static/render.js",
 	"/static/views.js",
 	"/static/router.js",
+	"/static/prefs.js",
+	"/static/types.js",
 	"/static/settings.js",
 	"/static/export.js",
 	"/static/typst.js",

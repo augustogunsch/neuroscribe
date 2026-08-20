@@ -108,6 +108,46 @@ document.addEventListener("drop", async function (e) {
 	ngRender();
 });
 
+/* ---- sync status ----
+ *
+ * A visible answer to "is my writing safe yet", which matters much more in an
+ * app that deliberately keeps working when the answer is "not on the server".
+ */
+
+function ngWireSyncStatus() {
+	const host = document.querySelector("[data-sync-status]");
+	if (!host) return;
+	const paint = function (state) {
+		host.replaceChildren();
+		let text, cls;
+		if (!state.online) {
+			text = ngT("Offline");
+			cls = "run-bad";
+		} else if (state.syncing) {
+			text = ngT("Syncing…");
+			cls = "run-meta";
+		} else if (state.pending) {
+			text = ngTF("%s waiting to sync", String(state.pending));
+			cls = "run-meta";
+		} else if (state.error) {
+			// online, nothing queued, and the last round still failed: the
+			// server is unreachable or unhappy, and saying "Synced" would lie
+			text = ngT("Cannot reach the server");
+			cls = "run-bad";
+		} else {
+			text = ngT("Synced");
+			cls = "run-ok";
+		}
+		host.appendChild(ngEl("span", { class: cls, text: text, title: state.error || "" }));
+		if (state.pending && state.online && !state.syncing) {
+			host.appendChild(ngEl("button", { type: "button", class: "linklike", text: ngT("Sync now"),
+				onclick: function () { ngSync(); } }));
+		}
+	};
+	ngOnSyncChange(paint);
+	ngSyncState().then(paint);
+}
+
 /* ---- keyboard shortcuts ---- */
 
 function inFormField(el) {
