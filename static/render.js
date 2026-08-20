@@ -159,3 +159,78 @@ function ngRenderMarkdown(target, source) {
 	ngDressCodeBlocks(target);
 	enhance(target); // KaTeX + Run buttons, shared with the rest of the app
 }
+
+/* ---- enhance rendered markdown: KaTeX math + run buttons ---- */
+
+/* Equation numbering & references. Display math may carry \label{key}
+   (auto-numbered) and/or \tag{x} (explicit tag, wins over the number);
+   \eqref{key} / \ref{key} anywhere in math becomes a link to the equation.
+   Scope is the enhanced fragment: one chapter page numbers 1, 2, 3… */
+
+function texTagText(tag) {
+	return tag.replace(/[\\{}]/g, "");
+}
+
+function collectEqLabels(mathEls) {
+	var labels = {};
+	var num = 0;
+	mathEls.forEach(function (el) {
+		if (el.dataset.rendered || !el.classList.contains("display")) return;
+		var tex = el.textContent;
+		var labelM = tex.match(/\\label\{([^}]+)\}/);
+		var tagM = tex.match(/\\tag\{([^}]+)\}/);
+		if (!labelM && !tagM) return;
+		var tag = tagM ? tagM[1] : String(++num);
+		if (!tagM) el.dataset.eqTag = tag;
+		if (labelM) {
+			var id = "eq-" + labelM[1].replace(/[^a-zA-Z0-9_-]/g, "-");
+			el.id = id;
+			labels[labelM[1]] = { tag: tag, id: id };
+		}
+	});
+	return labels;
+}
+
+function enhance(root) {
+	if (!(root instanceof Element) && root !== document) return;
+	var mathEls = root.querySelectorAll(".math");
+	var eqLabels = collectEqLabels(mathEls);
+	mathEls.forEach(function (el) {
+		if (el.dataset.rendered) return;
+		el.dataset.rendered = "1";
+		var tex = el.textContent;
+		// strip labels, apply auto-number tags, resolve references
+		tex = tex.replace(/\\label\{[^}]+\}/g, "");
+		if (el.dataset.eqTag) tex += "\\tag{" + texTagText(el.dataset.eqTag) + "}";
+		tex = tex.replace(/\\(?:eqref|ref)\{([^}]+)\}/g, function (_, key) {
+			var target = eqLabels[key];
+			if (!target) return "\\text{(?)}";
+			return "\\href{#" + target.id + "}{\\text{(" + texTagText(target.tag) + ")}}";
+		});
+		if (typeof katex !== "undefined") {
+			try {
+				katex.render(tex, el, {
+					displayMode: el.classList.contains("display"),
+					throwOnError: false,
+					trust: function (ctx) {
+						return ctx.command === "\\href" && ctx.url.charAt(0) === "#";
+					},
+				});
+			} catch (e) {
+				el.textContent = tex;
+			}
+		}
+	});
+	root.querySelectorAll(".codeblock[data-lang]").forEach(function (block) {
+		var lang = runnableLang(block.dataset.lang);
+		if (!lang || block.querySelector(".run-btn")) return;
+		var head = block.querySelector(".codehead");
+		if (!head) return;
+		var btn = document.createElement("button");
+		btn.type = "button";
+		btn.className = "run-btn";
+		btn.textContent = "▶ " + ngT("Run");
+		btn.addEventListener("click", function () { runSnippet(lang, block, btn); });
+		head.appendChild(btn);
+	});
+}

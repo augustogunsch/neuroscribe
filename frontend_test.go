@@ -176,13 +176,16 @@ func TestLockAndStrengthAreWiredIn(t *testing.T) {
 // The shell is one cached document for every page, so a CSRF token read from
 // its markup goes stale. Every client-side reader must use the cookie.
 func TestCSRFTokenIsReadFromTheCookie(t *testing.T) {
-	for _, asset := range []string{"static/pin.js", "static/lock.js", "static/app.js", "static/sync.js", "static/settings.js", "static/router.js"} {
+	for _, asset := range []string{
+		"static/csrf.js", "static/pin.js", "static/lock.js", "static/app.js",
+		"static/sync.js", "static/settings.js", "static/router.js",
+	} {
 		src := readAsset(t, asset)
 		if strings.Contains(src, `meta[name="csrf-token"]`) {
 			t.Errorf("%s still reads the CSRF token from a meta tag; the cached shell makes that stale", asset)
 		}
 	}
-	if !strings.Contains(readAsset(t, "static/app.js"), "ng_csrf=") {
-		t.Error("app.js no longer reads the token from the cookie")
+	if !strings.Contains(readAsset(t, "static/csrf.js"), "ng_csrf=") {
+		t.Error("csrf.js no longer reads the token from the cookie")
 	}
 }
