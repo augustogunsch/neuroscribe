@@ -1,9 +1,11 @@
 package main
 
-// The PIN lock and the password policy live entirely in the browser, because
-// both concern secrets the server is not allowed to have. That makes them hard
-// to test from here — but the properties worth protecting are structural, and
-// a Go test is the thing that runs on every commit.
+// Assertions about the frontend, read from the shipped assets.
+//
+// Go tests over JavaScript files, which is unusual and deliberate: the
+// properties they hold down — that the PIN never travels, that locking
+// destroys the key, that the CSRF token is read from the cookie — are promises
+// this project makes in prose, and prose does not fail a build.
 
 import (
 	"os"
