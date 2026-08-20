@@ -229,6 +229,9 @@ func (s *server) doLogin(w http.ResponseWriter, r *http.Request) {
 	_, dberr := s.db.Exec("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)",
 		hashToken(token), userID, time.Now().UTC().Add(sessionTTL).Format("2006-01-02 15:04:05"))
 	if dberr != nil {
+		// the classic cause is a database the service user cannot write —
+		// root-owned WAL files from a tool run as root; say so in the journal
+		log.Printf("create session for %q: %v", username, dberr)
 		httpError(w, 500, "failed to create session")
 		return
 	}

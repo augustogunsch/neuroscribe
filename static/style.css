@@ -716,6 +716,9 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
 /* ---- landing ---- */
 
 .landing-body {
+	/* decorative pieces (the hero halo, the glow) bleed past the edges by
+	   design; without this that bleed is 55px of horizontal scroll on phones */
+	overflow-x: hidden;
 	background: var(--bg);
 	position: relative;
 	overflow-x: hidden;
@@ -981,6 +984,22 @@ altcha-widget {
 .login-form button { margin-top: 0.4rem; padding: 0.55rem; font-size: 0.95rem; }
 
 @media (max-width: 760px) {
+	/* the hero halo bleeds 5rem past each edge for large screens; on a
+	   phone that bleed is the whole horizontal scroll, so it stops at the
+	   edges here — a radial gradient loses nothing visible by it */
+	.landing-hero::before { left: 0; right: 0; }
+
+	.landing-nav {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 0.7rem;
+	}
+	.landing-nav .landing-brand { justify-content: center; }
+	.landing-actions {
+		justify-content: center;
+	}
+	.landing-actions .btn { flex: 1; text-align: center; }
+	.landing-actions .gh-link { flex: none; }
 	.sidebar-resizer, .sidebar-toggle { display: none; }
 
 	.mobile-topbar {

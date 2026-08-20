@@ -24,9 +24,13 @@ func main() {
 	dbPath := envOr("DB", "neuroscribe.db")
 	addr := envOr("ADDR", "127.0.0.1:8484")
 
-	db := openDB(dbPath)
-	defer db.Close()
-
+	// The subcommands run before the database is opened, deliberately. A
+	// healthcheck is an HTTP probe and has no business touching SQLite — and
+	// when it is run as root (a deploy script over ssh), merely opening the
+	// database can leave root-owned WAL files behind that the service user
+	// can never write again. Every fresh login then dies at the session
+	// insert while existing sessions sail on, which is as confusing a
+	// failure as this app can produce.
 	// used as the container HEALTHCHECK, so the image ships no extra tools
 	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
 		target := addr
@@ -51,6 +55,7 @@ func main() {
 		runMailCLI(newMailer(envOr("BASE_URL", "http://"+addr)), os.Args[2:])
 		return
 	}
+
 	// Anything else is a mistake, and starting the server instead would look
 	// like it had worked.
 	if len(os.Args) > 1 {
@@ -58,6 +63,8 @@ func main() {
 			"Accounts are managed with sqlite3 against %s — see the README.", os.Args[1], dbPath)
 	}
 
+	db := openDB(dbPath)
+	defer db.Close()
 	srv := newServer(db, pyodideDir(), typstDir(), addr)
 	if srv.pyodideDir == "" {
 		log.Printf("warning: no Python runtime in ./pyodide — run `make pyodide` to enable python snippets")
