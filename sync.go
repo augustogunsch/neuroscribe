@@ -42,6 +42,12 @@ import (
 // so a bug on one device cannot fill an account with junk the others ignore.
 var recordKinds = map[string]bool{
 	"dir": true, "note": true, "chapter": true, "type": true, "image": true,
+	// "pin" carries one device's lock settings. Like every other payload it
+	// is sealed with the data key, so what the server holds is the fact that
+	// a lock exists and nothing about it — not the digits, and above all not
+	// the data key wrapped under them, which never leaves the device that
+	// set it. See the note in static/lock.js.
+	"pin": true,
 }
 
 const (
@@ -49,6 +55,7 @@ const (
 	maxSyncBody   = 24 << 20
 	maxPayloadLen = 512 << 10 // one sealed record; images keep bytes in blobs
 	maxBlobBody   = 12 << 20  // the largest plan's image, plus room for the seal
+	maxPinRecords = 20        // devices that may hold a PIN for one account
 )
 
 // Addresses are minted by the client, so their shape is enforced here: the
@@ -322,6 +329,10 @@ func overQuota(kind string, counts map[string]int, p plan) (bool, int) {
 		return counts["note"] >= p.MaxNotes, p.MaxNotes
 	case "image":
 		return counts["image"] >= p.MaxImages, p.MaxImages
+	case "pin":
+		// one per device, and nobody locks this many devices: the cap is here
+		// so a looping client cannot mint records forever, not to ration them.
+		return counts["pin"] >= maxPinRecords, maxPinRecords
 	}
 	return false, 0
 }
