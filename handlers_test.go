@@ -362,9 +362,15 @@ func TestAllowedHosts(t *testing.T) {
 	if hosts["evil.example.com"] {
 		t.Error("allowlist too permissive")
 	}
+	// An override adds the public domain; it must never revoke loopback —
+	// the healthcheck, the deploy script and local curl all speak to
+	// 127.0.0.1, and rebinding attacks never carry loopback names in Host.
 	custom := buildAllowedHosts("0.0.0.0:8484", "notes.example.com, localhost")
-	if !custom["notes.example.com"] || !custom["localhost"] || custom["127.0.0.1"] {
+	if !custom["notes.example.com"] || !custom["localhost"] || !custom["127.0.0.1"] {
 		t.Errorf("override allowlist wrong: %v", custom)
+	}
+	if custom["evil.example.com"] {
+		t.Error("override allowlist too permissive")
 	}
 }
 

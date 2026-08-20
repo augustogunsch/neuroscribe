@@ -37,16 +37,21 @@ func buildAllowedHosts(addr, override string) map[string]bool {
 			hosts[h] = true
 		}
 	}
+	// Loopback is always allowed, override or not. Rebinding attacks carry
+	// the attacker's domain in Host, never the literal loopback names — and
+	// the healthcheck, the deploy script and every local curl depend on
+	// loopback answering. An override that silently revoked it turned "set
+	// your domain" into "break your own health probes".
+	add("localhost")
+	add("127.0.0.1")
+	add("[::1]")
+	add("::1")
 	if override != "" {
 		for _, h := range strings.Split(override, ",") {
 			add(h)
 		}
 		return hosts
 	}
-	add("localhost")
-	add("127.0.0.1")
-	add("[::1]")
-	add("::1")
 	if host, _, err := net.SplitHostPort(addr); err == nil && host != "" && host != "0.0.0.0" && host != "::" {
 		add(host)
 	}
