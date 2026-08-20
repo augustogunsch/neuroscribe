@@ -295,6 +295,11 @@ var translations = map[string]map[string]string{
 
 		"Username or email": "Usuário ou e-mail",
 
+		"Sync repair": "Reparo de sincronização",
+		"If another device shows older content than this one, the server fell behind this device's copy. This pushes everything this device holds back to the server.": "Se outro dispositivo mostra conteúdo mais antigo que este, o servidor ficou para trás da cópia deste dispositivo. Isto reenvia ao servidor tudo o que este dispositivo guarda.",
+		"Push this device's copy to the server": "Enviar a cópia deste dispositivo ao servidor",
+		"%s records queued and synced.":         "%s registros enfileirados e sincronizados.",
+
 		// code / run
 		"Run":                "Executar",
 		"Running…":           "Executando…",

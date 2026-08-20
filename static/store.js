@@ -189,6 +189,19 @@ async function ngApplyRemote(remote) {
 	const store = tx.objectStore("records");
 	const local = await ngReq(store.get(remote.ref));
 	if (local && local.dirty) return "kept-local";
+	// The stranded-edit signature: same revision, different content, local
+	// clean. That combination has exactly one honest reading — this device's
+	// copy advanced without its push being recorded — so the local version is
+	// re-marked dirty and wins on the next round instead of being silently
+	// regressed to the server's stale copy.
+	if (local && !local.deleted && !remote.deleted &&
+		local.rev === remote.rev && local.payload &&
+		local.payload !== remote.payload) {
+		local.dirty = 1;
+		local.lw = (local.lw || 0) + 1;
+		await ngReq(store.put(local));
+		return "kept-local";
+	}
 	await ngReq(store.put({
 		ref: remote.ref,
 		kind: remote.kind,
@@ -274,6 +287,21 @@ async function ngMeta(key, def) {
 async function ngSetMeta(key, value) {
 	const tx = await ngTx(["meta"], "readwrite");
 	await ngReq(tx.objectStore("meta").put({ key: key, value: value }));
+}
+
+// ngMarkAllDirty queues every record this device holds for a fresh push —
+// the recovery tool for a server that fell behind this device's copy.
+// Tombstones ride along too, so deletions propagate with everything else.
+async function ngMarkAllDirty() {
+	const tx = await ngTx(["records"], "readwrite");
+	const store = tx.objectStore("records");
+	const rows = await ngReq(store.getAll());
+	for (const rec of rows) {
+		rec.dirty = 1;
+		rec.lw = (rec.lw || 0) + 1;
+		await ngReq(store.put(rec));
+	}
+	return rows.length;
 }
 
 // ngWipeLocal clears everything this device holds. Used when signing out: the

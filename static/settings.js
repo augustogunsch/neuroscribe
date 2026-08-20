@@ -352,6 +352,7 @@ async function ngViewSettings() {
 		ngPinCard(),
 		ngOfflineCard(),
 		ngExportCard(),
+		ngRepairCard(),
 		ngEl("div", { dataset: { accountHost: "1" } }, [
 			ngEl("p", { class: "page-hint", text: ngT("Loading…") }),
 		]),
@@ -455,6 +456,25 @@ async function ngCacheRuntime(id, want) {
 }
 
 /* ---- export ---- */
+
+// A recovery tool, not a routine one: pushes this device's entire copy back
+// to the server. Exists for the day a server falls behind a device — old
+// stranded edits, a restored server backup — and for peace of mind after one.
+function ngRepairCard() {
+	return ngEl("section", { class: "type-card" }, [
+		ngEl("h2", { text: ngT("Sync repair") }),
+		ngEl("p", { class: "page-hint", text: ngT("If another device shows older content than this one, the server fell behind this device's copy. This pushes everything this device holds back to the server.") }),
+		ngEl("button", { type: "button", class: "btn", text: ngT("Push this device's copy to the server"),
+			onclick: async function (e) {
+				const btn = e.target;
+				btn.disabled = true;
+				const n = await ngMarkAllDirty();
+				await ngSync();
+				btn.disabled = false;
+				ngToast(ngTF("%s records queued and synced.", String(n)));
+			} }),
+	]);
+}
 
 function ngExportCard() {
 	return ngEl("section", { class: "type-card" }, [
