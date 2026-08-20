@@ -24,8 +24,11 @@ package com.augustogunsch.neuroscribe;
  */
 
 import android.annotation.SuppressLint;
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.provider.MediaStore;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -36,16 +39,22 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.Toast;
 
+import androidx.activity.ComponentActivity;
 import androidx.activity.OnBackPressedCallback;
-import androidx.appcompat.app.AppCompatActivity;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.Map;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends ComponentActivity {
 
     private WebView web;
 
@@ -62,6 +71,52 @@ public class MainActivity extends AppCompatActivity {
         MIME.put("woff2", "font/woff2");
         MIME.put("wasm", "application/wasm");
         MIME.put("webmanifest", "application/manifest+json");
+    }
+
+    /* The three policies from handlers.go and runner.go, restated here.
+     *
+     * Worth a word, because it is the one piece of the server's security
+     * posture the app has to repeat rather than receive: these responses never
+     * come from the server, so nothing would attach a policy to them. Serving
+     * them bare would make the app the only place the frontend runs with no
+     * CSP at all.
+     *
+     * They are three and not one for the same reason they are three there. The
+     * page may not eval; the snippet runner must, because running a JavaScript
+     * snippet is eval by definition, which is why it is framed with an opaque
+     * origin and holds no session, no keys and no DOM of ours; and the
+     * typesetter's worker must, because wasm-bindgen's start-up builds a
+     * function from a string. Handing the page the runner's policy would undo
+     * the point of having two.
+     *
+     * The frontend and this file are frozen in the same build, so they only
+     * ever have to agree at build time — but if the policy over there gains a
+     * directive, this needs it too. */
+    private static final String CSP =
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+            + "font-src 'self'; img-src 'self' data: blob:; connect-src 'self'; "
+            + "worker-src 'self' blob:; frame-src 'self'; manifest-src 'self'; "
+            + "form-action 'self'; base-uri 'none'";
+
+    /* 'self' would match nothing from an opaque origin, so the runner's policy
+     * names this server. */
+    private static final String RUNNER_CSP =
+            "default-src 'none'; script-src " + BuildConfig.ORIGIN
+            + " 'unsafe-eval' 'wasm-unsafe-eval'; connect-src " + BuildConfig.ORIGIN
+            + "; worker-src blob:; child-src blob:; base-uri 'none'";
+
+    private static final String WORKER_CSP =
+            "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; "
+            + "connect-src 'self'; worker-src 'self'; base-uri 'none'";
+
+    private static String cspFor(String path) {
+        if (path.equals("/static/runner.html")) {
+            return RUNNER_CSP;
+        }
+        if (path.equals("/static/typst-worker.js")) {
+            return WORKER_CSP;
+        }
+        return CSP;
     }
 
     /* Paths the server owns. Everything else inside the app is the shell. */
@@ -142,7 +197,7 @@ public class MainActivity extends AppCompatActivity {
             // a poor way to find out the app is behind.
             if (path.startsWith("/static/") || path.startsWith("/strings/")
                     || path.equals("/manifest.webmanifest")) {
-                return asset("web" + path);
+                return asset("web" + path, path);
             }
 
             for (String p : SERVER_PATHS) {
@@ -153,7 +208,7 @@ public class MainActivity extends AppCompatActivity {
 
             // Every other address inside the app is one document — /notes/…,
             // /settings, /trash all render from the local store.
-            return asset("web/index.html");
+            return asset("web/index.html", "/");
         }
 
         @Override
@@ -173,8 +228,9 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /* asset returns a bundled file, or null so the request goes to the network. */
-    private WebResourceResponse asset(String name) {
+    /* asset returns a bundled file, or null so the request goes to the network.
+     * urlPath is the address it was asked for by, which decides its policy. */
+    private WebResourceResponse asset(String name, String urlPath) {
         // /strings/en.json is asked for with the suffix and stored with it, but
         // be forgiving: the frontend has used both spellings.
         InputStream in = open(name);
@@ -190,7 +246,31 @@ public class MainActivity extends AppCompatActivity {
             ext = name.substring(dot + 1).toLowerCase();
         }
         String mime = MIME.get(ext);
-        return new WebResourceResponse(mime != null ? mime : "application/octet-stream", "utf-8", in);
+        // The server sends these on every response, and a bundled one has to
+        // carry them too or the app would be the one place the app runs
+        // without them. The policy is the server's, minus frame-ancestors,
+        // which has no meaning inside a WebView that frames nothing.
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Content-Security-Policy", cspFor(urlPath));
+        headers.put("X-Content-Type-Options", "nosniff");
+        headers.put("Referrer-Policy", "no-referrer");
+        return new WebResourceResponse(
+                mime != null ? mime : "application/octet-stream", "utf-8",
+                200, "OK", headers, in);
+    }
+
+    /* A name Downloads will accept, and one that cannot point anywhere else:
+     * the page chooses it, and a page is not something to take a path from. */
+    private static String safeName(String name) {
+        String clean = name == null ? "" : name.replaceAll("[/\\\\:*?\"<>|]+", "_").trim();
+        if (clean.isEmpty()) {
+            clean = "neuroscribe-export";
+        }
+        return clean.length() > 120 ? clean.substring(0, 120) : clean;
+    }
+
+    private void toast(String message) {
+        runOnUiThread(() -> Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show());
     }
 
     private InputStream open(String name) {
@@ -224,6 +304,61 @@ public class MainActivity extends AppCompatActivity {
                 prefs.edit().putString("device_id", id).apply();
             }
             return id;
+        }
+
+        /*
+         * Saving an exported file.
+         *
+         * A WebView ignores blob: downloads outright — no download, no error,
+         * nothing — so a PDF export would look like it had worked and leave
+         * nothing behind. The page hands the bytes over here instead, in
+         * chunks, because a whole document in one call across this bridge is
+         * asking to hit a limit nobody documents.
+         *
+         * The chunks land in the app's own cache directory and only become a
+         * file in Downloads once the last one arrives, so an export that fails
+         * halfway leaves no half a PDF for someone to open and puzzle over.
+         */
+        @JavascriptInterface
+        public void saveFile(String name, String mime, String base64,
+                             boolean first, boolean last) {
+            try {
+                File staging = new File(getCacheDir(), "export.part");
+                if (first && staging.exists() && !staging.delete()) {
+                    throw new IOException("could not clear the last export");
+                }
+                byte[] bytes = Base64.decode(base64, Base64.DEFAULT);
+                try (FileOutputStream out = new FileOutputStream(staging, !first)) {
+                    out.write(bytes);
+                }
+                if (!last) {
+                    return;
+                }
+                ContentValues meta = new ContentValues();
+                meta.put(MediaStore.Downloads.DISPLAY_NAME, safeName(name));
+                meta.put(MediaStore.Downloads.MIME_TYPE, mime);
+                meta.put(MediaStore.Downloads.IS_PENDING, 1);
+                ContentResolver resolver = getContentResolver();
+                Uri target = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, meta);
+                if (target == null) {
+                    throw new IOException("no room in Downloads");
+                }
+                try (InputStream in = new FileInputStream(staging);
+                     OutputStream out = resolver.openOutputStream(target)) {
+                    byte[] buf = new byte[64 * 1024];
+                    int n;
+                    while ((n = in.read(buf)) > 0) {
+                        out.write(buf, 0, n);
+                    }
+                }
+                meta.clear();
+                meta.put(MediaStore.Downloads.IS_PENDING, 0);
+                resolver.update(target, meta, null, null);
+                staging.delete();
+                toast(getString(R.string.saved_to_downloads, safeName(name)));
+            } catch (Exception e) {
+                toast(getString(R.string.export_failed));
+            }
         }
 
         @JavascriptInterface

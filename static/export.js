@@ -7,7 +7,28 @@
  * assembled anywhere but here.
  */
 
-function ngDownload(blob, name) {
+// ngDownload hands a finished file to whoever is hosting the page.
+//
+// In a browser that is an <a download> pointed at an object URL. In the Android
+// app it cannot be: a WebView does not download blob: URLs — the click is
+// simply ignored, with no error anywhere — so a PDF export would appear to work
+// and produce nothing. The app supplies a way through instead, and the bytes go
+// over it in chunks because the bridge between a page and its host is not a
+// place to put a whole document in one call.
+async function ngDownload(blob, name) {
+	const native = window.NeuroscribeNative;
+	if (native && typeof native.saveFile === "function") {
+		const bytes = new Uint8Array(await blob.arrayBuffer());
+		const chunk = 256 * 1024;
+		for (let at = 0; at < bytes.length || at === 0; at += chunk) {
+			const slice = bytes.subarray(at, at + chunk);
+			let binary = "";
+			for (let i = 0; i < slice.length; i++) binary += String.fromCharCode(slice[i]);
+			native.saveFile(name, blob.type || "application/octet-stream",
+				btoa(binary), at === 0, at + chunk >= bytes.length);
+		}
+		return;
+	}
 	const url = URL.createObjectURL(blob);
 	const a = document.createElement("a");
 	a.href = url;
@@ -54,7 +75,7 @@ async function ngExportNotePDF(ref) {
 			date: new Date().toISOString().slice(0, 10),
 			contents: ngT("Contents"),
 		});
-		ngDownload(new Blob([pdf], { type: "application/pdf" }), ngSafeName(note.title) + ".pdf");
+		await ngDownload(new Blob([pdf], { type: "application/pdf" }), ngSafeName(note.title) + ".pdf");
 	} catch (err) {
 		ngToast(ngT("The typesetter could not build this note.") + " " + String((err && err.message) || err));
 	}
@@ -121,7 +142,7 @@ async function ngExportEverything(button) {
 			} catch (err) { /* an image that will not open is left out */ }
 		}
 
-		ngDownload(await ngZip(entries), "neuroscribe-export.zip");
+		await ngDownload(await ngZip(entries), "neuroscribe-export.zip");
 	} finally {
 		if (button) {
 			button.disabled = false;

@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Neuroscribe</string>
+    <string name="saved_to_downloads">Saved %1$s to Downloads</string>
+    <string name="export_failed">The export could not be saved</string>
 </resources>

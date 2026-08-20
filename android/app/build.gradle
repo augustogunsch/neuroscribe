@@ -33,9 +33,12 @@ android {
 
     defaultConfig {
         applicationId 'com.augustogunsch.neuroscribe'
-        // WebView on 26+ has the standards the frontend assumes, and anything
-        // older cannot run the crypto this app is built around.
-        minSdk 26
+        // 29 rather than lower for one concrete reason: saving an export to
+        // Downloads needs WRITE_EXTERNAL_STORAGE below Android 10 and no
+        // permission at all from 10 onwards. Asking for storage access in an
+        // app that stores everything in its own sandbox is a bad trade for the
+        // few devices it would add.
+        minSdk 29
         targetSdk 34
         versionCode appCode
         versionName appVersion
@@ -88,6 +91,22 @@ android {
 }
 
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.6.1'
+    // ComponentActivity, for the back-press dispatcher. Deliberately not
+    // appcompat: this app is a WebView and a theme, and it uses nothing
+    // appcompat provides.
     implementation 'androidx.activity:activity:1.8.2'
+}
+
+/* Kotlin 1.8 folded kotlin-stdlib-jdk7 and -jdk8 into kotlin-stdlib. The
+ * androidx graph still asks for the old split artifacts at 1.6.21 alongside the
+ * merged one at 1.8.22, and every class that moved is then defined twice, which
+ * Gradle reports as several screens of "Duplicate class kotlin.…" and no clue
+ * as to why. Pinning the pair to 1.8.22 resolves it: at that version they are
+ * empty shims that only depend on kotlin-stdlib. */
+configurations.all {
+    resolutionStrategy {
+        force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+    }
 }
