@@ -78,8 +78,9 @@ uninstall first, and uninstalling takes the notes on that phone with it.
 ## Building it
 
 Needs a JDK 17 and the Android SDK (command-line tools are enough; Gradle
-downloads the rest). If `gradlew` is not in `android/`, generate the wrapper
-once with a local Gradle:
+downloads the rest). The make targets use `android/gradlew` when it exists and
+fall back to whatever `gradle` is installed. To pin the build to one Gradle
+version rather than to whatever is on the machine, generate the wrapper once:
 
 ```sh
 cd android && gradle wrapper --gradle-version 8.7

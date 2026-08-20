@@ -209,7 +209,10 @@ APP_VERSION := $(shell awk -F= '/^VERSION/ {gsub(/[ \t]/,"",$$2); print $$2}' ap
 APP_ORIGIN  := $(shell awk -F'= *' '/^ORIGIN/ {print $$2}' app.version)
 APP_ASSETS  := android/app/src/main/assets/web
 APK         := android/app/build/outputs/apk/release/neuroscribe-$(APP_VERSION).apk
-GRADLE      ?= ./gradlew
+# The wrapper if the project has one, otherwise whatever gradle is installed.
+# Generate the wrapper once with `cd android && gradle wrapper` if you want the
+# build pinned to a version rather than to whatever is on the machine.
+GRADLE      ?= $(shell [ -x android/gradlew ] && echo ./gradlew || echo gradle)
 
 app-version:
 	@echo "version $(APP_VERSION), syncing with $(APP_ORIGIN)"
