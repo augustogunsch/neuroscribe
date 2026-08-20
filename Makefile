@@ -170,9 +170,12 @@ deploy: release
 		&& chown -R root:neuroscribe $(DEPLOY_DIR) \
 		&& chown -R neuroscribe:neuroscribe $(DEPLOY_DIR)/data \
 		&& chmod 750 $(DEPLOY_DIR) $(DEPLOY_DIR)/$(BINARY) $(DEPLOY_DIR)/data \
-		&& systemctl restart $(DEPLOY_SERVICE) \
+		&& systemctl reset-failed $(DEPLOY_SERVICE) 2>/dev/null; \
+		systemctl restart $(DEPLOY_SERVICE) \
 		&& for i in 1 2 3 4 5 6 7 8 9 10; do \
-			$(DEPLOY_DIR)/$(BINARY) healthcheck && exit 0; sleep 1; \
+			$(DEPLOY_DIR)/$(BINARY) healthcheck 2>/dev/null \
+				&& echo "healthy after $$i s" && exit 0; \
+			sleep 1; \
 		done; \
 		echo "--- service did not become healthy; recent log: ---"; \
 		journalctl -u $(DEPLOY_SERVICE) -n 25 --no-pager; exit 1'
