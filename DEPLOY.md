@@ -102,6 +102,9 @@ ExecStart=/srv/neuroscribe/neuroscribe
 Restart=on-failure
 
 # the process writes only its database directory; everything else is read-only
+# nothing the service creates is ever world-readable — the database and its
+# WAL files inherit this, so their modes stay right without anyone remembering
+UMask=0027
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
