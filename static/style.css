@@ -1204,3 +1204,8 @@ body.is-locked { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
 	.boot-spinner { animation: none; border-top-color: var(--border); }
 }
+
+/* ---- the one irreversible corner of settings ---- */
+
+.danger-zone { border-color: var(--danger); }
+.danger-zone h2 { color: var(--danger); }

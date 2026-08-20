@@ -300,6 +300,16 @@ var translations = map[string]map[string]string{
 		"Push this device's copy to the server": "Enviar a cópia deste dispositivo ao servidor",
 		"%s records queued and synced.":         "%s registros enfileirados e sincronizados.",
 
+		"Delete account":      "Excluir conta",
+		"Delete my account":   "Excluir minha conta",
+		"Deleting…":           "Excluindo…",
+		"Type %s to confirm":  "Digite %s para confirmar",
+		"Type %s to confirm.": "Digite %s para confirmar.",
+		"Delete this account and everything in it? This cannot be undone.": "Excluir esta conta e tudo que há nela? Isto não pode ser desfeito.",
+		"This erases the account and every note, chapter, image and note type in it, on the server and on this device. There is no backup and no recovery: the server never had a readable copy, so nobody can restore this for you.": "Isto apaga a conta e todas as notas, capítulos, imagens e tipos de nota nela, no servidor e neste dispositivo. Não há backup nem recuperação: o servidor nunca teve uma cópia legível, então ninguém pode restaurar isto para você.",
+		"Export your notes first if you want to keep them.": "Exporte suas notas antes, se quiser mantê-las.",
+		"The account could not be deleted.":                 "Não foi possível excluir a conta.",
+
 		// code / run
 		"Run":                "Executar",
 		"Running…":           "Executando…",

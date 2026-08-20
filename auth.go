@@ -360,3 +360,60 @@ func (s *server) changePassword(w http.ResponseWriter, r *http.Request) {
 	log.Printf("password changed for %q (other sessions revoked)", u.Name)
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// deleteAccount erases the account and everything in it, for good.
+//
+// The password is proven first, exactly as signing in proves it: a session
+// cookie says who you are, and someone who finds an unlocked laptop should not
+// be able to destroy an account with one click. The row goes, and every record,
+// blob, session, verification and preference goes with it through the schema's
+// cascades — the server has nothing left that belonged to this account, and
+// nothing readable to leave behind even if it did.
+func (s *server) deleteAccount(w http.ResponseWriter, r *http.Request) {
+	u := userFrom(r)
+	if u.ID == 0 {
+		httpError(w, http.StatusUnauthorized, "sign in first")
+		return
+	}
+	key := throttleKey(r, u.Name)
+	if blocked, wait := s.loginTries.blocked(key); blocked {
+		httpError(w, http.StatusTooManyRequests,
+			s.translatef("Too many attempts. Try again in %d minute(s).", int(wait.Minutes())+1))
+		return
+	}
+	var passHash string
+	if err := s.db.QueryRow("SELECT pass_hash FROM users WHERE id = ?", u.ID).Scan(&passHash); err != nil {
+		httpError(w, http.StatusForbidden, s.translate("Wrong password."))
+		return
+	}
+	authKey := r.FormValue("password_auth")
+	if authKey == "" || bcrypt.CompareHashAndPassword([]byte(passHash), []byte(authKey)) != nil {
+		s.loginTries.fail(key)
+		time.Sleep(passFailPause)
+		httpError(w, http.StatusForbidden, s.translate("Wrong password."))
+		return
+	}
+	s.loginTries.reset(key)
+
+	// Cascades depend on foreign keys being enforced on this connection; the
+	// DSN turns them on, and this is the one place where a silent failure
+	// would leave an account's records orphaned but readable-by-count forever.
+	var fk int
+	if err := s.db.QueryRow("PRAGMA foreign_keys").Scan(&fk); err != nil || fk != 1 {
+		log.Printf("delete account %q: foreign keys are OFF; refusing to orphan records", u.Name)
+		httpError(w, 500, "could not delete the account")
+		return
+	}
+	if _, err := s.db.Exec("DELETE FROM users WHERE id = ?", u.ID); err != nil {
+		log.Printf("delete account %q: %v", u.Name, err)
+		httpError(w, 500, "could not delete the account")
+		return
+	}
+	log.Printf("account %q (id %d) deleted at its own request from %s", u.Name, u.ID, clientIP(r))
+
+	http.SetCookie(w, &http.Cookie{
+		Name: sessionCookie, Value: "", Path: "/", MaxAge: -1,
+		HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: isHTTPS(r),
+	})
+	w.WriteHeader(http.StatusNoContent)
+}

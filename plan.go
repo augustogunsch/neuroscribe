@@ -24,10 +24,10 @@ var plans = map[string]plan{
 	"free": {
 		Key:             "free",
 		Name:            "Free",
-		MaxNotes:        500,
-		MaxImages:       20,
+		MaxNotes:        50,
+		MaxImages:       10,
 		MaxImageBytes:   5 << 20,
-		MaxChapterBytes: 500 << 10,
+		MaxChapterBytes: 50 << 10,
 		MaxRecords:      25000,
 	},
 	"premium": {

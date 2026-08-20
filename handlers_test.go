@@ -940,13 +940,23 @@ func TestPasswordsHaveNoNameToTravelUnder(t *testing.T) {
 			}
 		}
 	}
-	// and the change endpoint only ever sees derived keys
+	// and the endpoints that prove a password only ever see derived keys
 	js := readAsset(t, "static/settings.js")
 	if !strings.Contains(js, "old_auth_key: old.authKey") {
 		t.Error("the change flow no longer sends the derived auth key")
 	}
-	if strings.Contains(js, "current.value,") && strings.Contains(js, "body: new URLSearchParams({ password") {
-		t.Error("a raw password appears in a request body")
+	if !strings.Contains(js, "password_auth: derived.authKey") {
+		t.Error("the delete flow no longer sends the derived auth key")
+	}
+	// The real invariant: no request body carries a password field's value.
+	// A key *named* password_auth is fine — that is the derived proof — so
+	// this reads what is being sent, not what it is called.
+	for _, body := range regexp.MustCompile(`URLSearchParams\(\{[^}]*\}`).FindAllString(js, -1) {
+		for _, held := range []string{"password.value", "current.value", "next.value", "pin"} {
+			if strings.Contains(body, held) {
+				t.Errorf("a request body carries %s: %s", held, body)
+			}
+		}
 	}
 }
 

@@ -357,6 +357,7 @@ async function ngViewSettings() {
 			ngEl("p", { class: "page-hint", text: ngT("Loading…") }),
 		]),
 		ngDisclosureCard(),
+		ngDeleteAccountCard(),
 	);
 	ngWireLockSettings();
 	const account = await ngFetchAccount();
@@ -473,6 +474,85 @@ function ngRepairCard() {
 				btn.disabled = false;
 				ngToast(ngTF("%s records queued and synced.", String(n)));
 			} }),
+	]);
+}
+
+// Deleting the account. Two locks, because this is the one irreversible
+// button in the app: the password, and typing the username. Nothing here is
+// recoverable afterwards — not by support, not by a backup, not by the
+// server, which never had a readable copy in the first place.
+function ngDeleteAccountCard() {
+	const me = document.body.dataset.user || "";
+	const confirmName = ngEl("input", { type: "text", autocomplete: "off", placeholder: me });
+	const password = ngEl("input", { type: "password", autocomplete: "current-password" });
+	const error = ngEl("p", { class: "warn slim", hidden: true });
+	const button = ngEl("button", { type: "submit", class: "danger", text: ngT("Delete my account") });
+
+	const fail = function (message) {
+		error.textContent = message;
+		error.hidden = false;
+	};
+
+	const form = ngEl("form", { class: "settings-form", onsubmit: async function (e) {
+		e.preventDefault();
+		error.hidden = true;
+		if (confirmName.value.trim() !== me) {
+			fail(ngTF("Type %s to confirm.", me));
+			return;
+		}
+		if (!password.value) {
+			fail(ngT("Enter your password to confirm."));
+			return;
+		}
+		if (!(await ngConfirm(ngT("Delete this account and everything in it? This cannot be undone."), true))) {
+			return;
+		}
+		button.disabled = true;
+		button.textContent = ngT("Deleting…");
+		try {
+			// proven the way signing in proves it: only the derived key travels
+			const params = await (await fetch("/auth/params?username=" + encodeURIComponent(me))).json();
+			const derived = await ngDeriveKeys(password.value, params.salt);
+			const resp = await fetch("/account/delete", {
+				method: "POST",
+				headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": csrfToken() },
+				body: new URLSearchParams({ password_auth: derived.authKey }),
+			});
+			if (!resp.ok) {
+				fail(resp.status === 403 ? ngT("Wrong password.")
+					: (await resp.text()).trim() || ngT("The account could not be deleted."));
+				return;
+			}
+			// the server is done; leave nothing on this device either
+			await ngWipeLocal();
+			if (typeof ngClearPin === "function") ngClearPin();
+			ngForgetDataKey();
+			localStorage.clear();
+			if (window.caches) {
+				for (const name of await caches.keys()) await caches.delete(name);
+			}
+			if (navigator.serviceWorker) {
+				for (const reg of await navigator.serviceWorker.getRegistrations()) await reg.unregister();
+			}
+			location.href = "/";
+		} catch (err) {
+			fail(String((err && err.message) || err));
+		} finally {
+			button.disabled = false;
+			button.textContent = ngT("Delete my account");
+		}
+	} }, [
+		ngEl("label", { class: "meta-label", text: ngTF("Type %s to confirm", me) + " " }, [confirmName]),
+		ngEl("label", { class: "meta-label", text: ngT("Your password") + " " }, [password]),
+		error,
+		ngEl("div", {}, [button]),
+	]);
+
+	return ngEl("section", { class: "type-card danger-zone" }, [
+		ngEl("h2", { text: ngT("Delete account") }),
+		ngEl("p", { class: "warn slim", text: ngT("This erases the account and every note, chapter, image and note type in it, on the server and on this device. There is no backup and no recovery: the server never had a readable copy, so nobody can restore this for you.") }),
+		ngEl("p", { class: "page-hint", text: ngT("Export your notes first if you want to keep them.") }),
+		form,
 	]);
 }
 

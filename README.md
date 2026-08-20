@@ -179,7 +179,7 @@ gracefully without them, and every file is checked against `assets.sha256`.
   the result is set in Computer Modern — the classic LaTeX look. Nothing is
   sent anywhere.
 - **Plans** — quotas keep one account from filling the disk, and appear only in
-  settings. Free: 500 notes, 20 images of 5 MiB, 500 KiB per chapter. Premium:
+  settings. Free: 50 notes, 10 images of 5 MiB, 50 KiB per chapter. Premium:
   5000 notes, 500 images of 10 MiB, 8 MiB per chapter. Set the `plan` column
   in the `users` table.
 - **Password policy** — sign-up measures the password with zxcvbn rather than

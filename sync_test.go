@@ -11,8 +11,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 func sealed(text string) string {
@@ -275,5 +277,72 @@ func TestSyncResponsesAreNoStore(t *testing.T) {
 		if got := resp.Header.Get("Cache-Control"); got != "no-store" {
 			t.Errorf("%s served with Cache-Control %q, want no-store", path, got)
 		}
+	}
+}
+
+// Deleting an account must actually erase it — every record, blob, session and
+// preference — and must cost the password, because a session cookie says who
+// you are but a found laptop should not be able to destroy an account.
+func TestAccountDeletion(t *testing.T) {
+	ts, ck, db := newTestServer(t)
+
+	// give the account something to lose, including a second session
+	push(t, ts, ck, []syncRecord{
+		{Ref: "keep0001", Kind: "note", Payload: sealed("eA")},
+		{Ref: "img00002", Kind: "image", Payload: sealed("bWV0YQ")},
+	})
+	db.Exec("INSERT INTO blobs (user_id, ref, data) VALUES (1, 'img00002', 'bytes')")
+	db.Exec("INSERT INTO user_settings (user_id, key, value) VALUES (1, 'theme', 'dark')")
+	other := newSessionToken()
+	db.Exec("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, 1, ?)",
+		hashToken(other), time.Now().UTC().Add(time.Hour).Format("2006-01-02 15:04:05"))
+
+	// a second account's data must survive all of this untouched
+	victim := newAccount(t, db, "bystander")
+	push(t, ts, victim, []syncRecord{{Ref: "theirs01", Kind: "note", Payload: sealed("eQ")}})
+
+	var salt string
+	db.QueryRow("SELECT kdf_salt FROM users WHERE id = 1").Scan(&salt)
+	authKey, _ := testDeriveKeys(t, "test-password", salt)
+
+	// the wrong password is refused and nothing is touched
+	if resp := doPost(t, ts, ck, "/account/delete",
+		url.Values{"password_auth": {"bm90LXRoZS1yaWdodC1rZXktYXQtYWxsLXNvcnJ5ISE="}}); resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("wrong password accepted: %d", resp.StatusCode)
+	}
+	var still int
+	db.QueryRow("SELECT count(*) FROM users WHERE id = 1").Scan(&still)
+	if still != 1 {
+		t.Fatal("a refused deletion removed the account anyway")
+	}
+
+	// the right password erases everything
+	if resp := doPost(t, ts, ck, "/account/delete",
+		url.Values{"password_auth": {authKey}}); resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("deletion refused: %d %s", resp.StatusCode, bodyOf(t, resp))
+	}
+
+	for _, probe := range []struct {
+		what, query string
+	}{
+		{"user row", "SELECT count(*) FROM users WHERE id = 1"},
+		{"records", "SELECT count(*) FROM records WHERE user_id = 1"},
+		{"blobs", "SELECT count(*) FROM blobs WHERE user_id = 1"},
+		{"sessions", "SELECT count(*) FROM sessions WHERE user_id = 1"},
+		{"settings", "SELECT count(*) FROM user_settings WHERE user_id = 1"},
+	} {
+		var n int
+		db.QueryRow(probe.query).Scan(&n)
+		if n != 0 {
+			t.Errorf("%s survived deletion: %d rows", probe.what, n)
+		}
+	}
+
+	// the deleted account's session is dead; the bystander is untouched
+	if r := doGet(t, ts, ck, "/account"); r.StatusCode == http.StatusOK {
+		t.Error("the deleted account can still use its session")
+	}
+	if page := pull(t, ts, victim, 0); len(page.Records) != 1 {
+		t.Errorf("another account lost data: %+v", page.Records)
 	}
 }

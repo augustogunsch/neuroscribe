@@ -83,6 +83,8 @@ func newServer(db *sql.DB, pyodideDir, typstDir string, addr string) *server {
 	// rotates the password: old auth key proven, new salt + auth key +
 	// re-wrapped data key installed, other sessions revoked
 	m.HandleFunc("POST /auth/password", s.changePassword)
+	// erases the account and everything in it, password proven first
+	m.HandleFunc("POST /account/delete", s.deleteAccount)
 
 	// ---- the sync API: the whole of what this server does with user data ----
 	m.HandleFunc("GET /sync", s.syncPull)
