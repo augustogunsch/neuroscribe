@@ -20,9 +20,18 @@
 
 	/* Registering the worker is what turns this from a page into something
 	   that still opens on a train. Root scope, so it controls /notes/… too;
-	   see shell.go for why it is served from / rather than /static/. */
+	   see shell.go for why it is served from / rather than /static/.
+
+	   Not in the installed app, though. There the frontend is already on the
+	   device, served out of the APK, and it is meant to stay the version that
+	   was installed until someone installs another one. A worker would fetch
+	   /sw.js and the shell from the server and cache those instead — which is
+	   precisely the automatic update the app exists to not do. */
 	if ("serviceWorker" in navigator) {
 		window.addEventListener("load", function () {
+			/* read here, not above: this file runs in <head>, where there is
+			   no body yet to carry the marker */
+			if (document.body && document.body.dataset.native) return;
 			navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(function () {
 				/* no worker: the app still works, just not offline */
 			});

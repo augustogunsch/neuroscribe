@@ -18,6 +18,7 @@ const (
 type server struct {
 	db            *sql.DB
 	pyodideDir    string
+	downloadsDir  string
 	assetVersion  string
 	typstDir      string
 	mux           *http.ServeMux
@@ -44,6 +45,7 @@ func newServer(db *sql.DB, pyodideDir, typstDir string, addr string) *server {
 		pages:            map[string]*template.Template{},
 		chroma:           chromaCSS(),
 		assetVersion:     buildVersion(),
+		downloadsDir:     downloadsDir(),
 		allowedHosts:     buildAllowedHosts(addr, envOr("ALLOWED_HOSTS", "")),
 		loginTries:       newThrottle(maxLoginFailures, loginLockout),
 		registerTries:    newThrottle(registerPerWindow, registerWindow),
@@ -70,6 +72,7 @@ func newServer(db *sql.DB, pyodideDir, typstDir string, addr string) *server {
 	m.HandleFunc("POST /register/resend", s.resendVerification)
 	m.HandleFunc("GET /verify", s.verifyEmail)
 	m.HandleFunc("GET /altcha/challenge", s.altchaChallengeHandler)
+	m.HandleFunc("GET /download/neuroscribe.apk", s.serveAPK)
 	m.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		if err := s.db.PingContext(r.Context()); err != nil {
 			httpError(w, http.StatusServiceUnavailable, "database unavailable")
@@ -344,4 +347,5 @@ func takeFlash(w http.ResponseWriter, r *http.Request) string {
 type landingPage struct {
 	Registration bool
 	CSRF         string
+	App          appRelease
 }

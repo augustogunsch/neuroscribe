@@ -9,6 +9,10 @@ also runs in the browser, so a note is never sent anywhere to be printed.
 Deploying to a server? [DEPLOY.md](DEPLOY.md) is the short path: build,
 systemd unit, nginx, TLS, first account, verification.
 
+There is an Android app too — an APK offered from the landing page, not a store
+listing, which carries its own copy of the frontend and updates only when you
+install a new one. [ANDROID.md](ANDROID.md) covers building and publishing it.
+
 ## Run
 
 ```sh

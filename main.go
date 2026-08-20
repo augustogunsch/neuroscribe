@@ -55,11 +55,19 @@ func main() {
 		runMailCLI(newMailer(envOr("BASE_URL", "http://"+addr)), os.Args[2:])
 		return
 	}
+	// `neuroscribe bundle <dir>` writes the frozen frontend the Android app
+	// carries. A build step, not a server one — it touches no database.
+	if len(os.Args) > 1 && os.Args[1] == "bundle" {
+		if err := runBundle(os.Args[2:]); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 
 	// Anything else is a mistake, and starting the server instead would look
 	// like it had worked.
 	if len(os.Args) > 1 {
-		log.Fatalf("unknown subcommand %q: this binary takes only `healthcheck` and `mail`.\n"+
+		log.Fatalf("unknown subcommand %q: this binary takes only `healthcheck`, `mail` and `bundle`.\n"+
 			"Accounts are managed with sqlite3 against %s — see the README.", os.Args[1], dbPath)
 	}
 

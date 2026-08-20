@@ -394,8 +394,39 @@ function ngWireGlobalActions() {
 
 /* ---- boot ---- */
 
+// ngHydrateShell fills in what the server would have stamped into the page.
+//
+// On the web the shell is rendered per request, so it arrives already knowing
+// who is signed in and whether this server has the Python runtime and the
+// typesetter. The installed app has no such luxury: its shell was rendered once
+// at build time, for nobody in particular. Those same three facts are what
+// /account answers, so they are fetched instead — and kept, because the answer
+// has to survive being offline, which is most of why the app exists.
+async function ngHydrateShell() {
+	const body = document.body;
+	if (!body.dataset.native || body.dataset.user) return;
+	let info = null;
+	try {
+		const resp = await fetch("/account", { headers: { "X-Requested-With": "neuroscribe" } });
+		if (resp.ok) {
+			info = await resp.json();
+			localStorage.setItem("ng-account", JSON.stringify(info));
+		}
+	} catch (err) { /* offline: the last answer is a good answer */ }
+	if (!info) {
+		try {
+			info = JSON.parse(localStorage.getItem("ng-account") || "null");
+		} catch (err) { /* nothing kept: the app will ask for a sign-in */ }
+	}
+	if (!info || !info.username) return;
+	body.dataset.user = info.username;
+	if (info.runner_ok) body.dataset.runner = "1";
+	if (info.pdf_ok) body.dataset.typst = "1";
+}
+
 async function ngBootApp() {
 	if (!document.body || !document.body.dataset.app) return;
+	await ngHydrateShell();
 	await ngLoadStrings();
 	ngWireGlobalActions();
 	ngWireSyncStatus();

@@ -113,7 +113,11 @@ func (s *server) requireAuth(w http.ResponseWriter, r *http.Request) (*http.Requ
 		p == "/sw.js", p == "/manifest.webmanifest",
 		strings.HasPrefix(p, "/strings/"),
 		// fetched by the sandboxed runner, which has no session to send
-		strings.HasPrefix(p, "/pyodide/"):
+		strings.HasPrefix(p, "/pyodide/"),
+		// the Android app, offered from the landing page to people who by
+		// definition have not signed in yet — and which carries no account
+		// data, being the same file for everyone who asks
+		p == "/download/"+apkName:
 		return r, true
 	}
 	if signedIn {

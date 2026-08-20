@@ -1,0 +1,93 @@
+/* The app module.
+ *
+ * versionName and versionCode are not written here: they come from
+ * ../../app.version at the repository root, which is the one place the
+ * release is named. See the comments in that file. */
+
+plugins {
+    id 'com.android.application'
+}
+
+def appProps = new Properties()
+file("${rootDir}/../app.version").withInputStream { appProps.load(it) }
+
+def appVersion = (appProps.getProperty('VERSION') ?: '0.0.0').trim()
+def appOrigin = (appProps.getProperty('ORIGIN') ?: '').trim()
+if (!appOrigin) {
+    throw new GradleException("app.version must set ORIGIN to the server this app syncs with")
+}
+def appHost = new URI(appOrigin).host
+
+/* 1.2.3 becomes 10203. Android orders installs by this integer and refuses
+ * anything that is not larger than what is on the phone, so deriving it from
+ * the name means it can never disagree with the name. */
+def parts = appVersion.tokenize('.')
+if (parts.size() != 3) {
+    throw new GradleException("VERSION in app.version must look like 1.2.3, got '${appVersion}'")
+}
+def appCode = parts[0].toInteger() * 10000 + parts[1].toInteger() * 100 + parts[2].toInteger()
+
+android {
+    namespace 'com.augustogunsch.neuroscribe'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.augustogunsch.neuroscribe'
+        // WebView on 26+ has the standards the frontend assumes, and anything
+        // older cannot run the crypto this app is built around.
+        minSdk 26
+        targetSdk 34
+        versionCode appCode
+        versionName appVersion
+
+        buildConfigField 'String', 'ORIGIN', "\"${appOrigin}\""
+        buildConfigField 'String', 'ORIGIN_HOST', "\"${appHost}\""
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    signingConfigs {
+        release {
+            // Supplied by `make app-release`, which reads them from the
+            // environment so no key or password is ever written into the repo.
+            def store = System.getenv('NEUROSCRIBE_KEYSTORE')
+            if (store) {
+                storeFile file(store)
+                storePassword System.getenv('NEUROSCRIBE_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('NEUROSCRIBE_KEY_ALIAS') ?: 'neuroscribe'
+                keyPassword System.getenv('NEUROSCRIBE_KEY_PASSWORD')
+                        ?: System.getenv('NEUROSCRIBE_KEYSTORE_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            // Nothing to shrink: the app is a WebView and a few hundred lines.
+            minifyEnabled false
+            if (System.getenv('NEUROSCRIBE_KEYSTORE')) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // The APK is named after the version, because it is downloaded from a web
+    // page and lands in a folder next to the last one.
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            outputFileName = "neuroscribe-${appVersion}.apk"
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.activity:activity:1.8.2'
+}

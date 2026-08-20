@@ -10,3 +10,4 @@ backups/
 /pyodide/
 /typst/
 dist/
+downloads/

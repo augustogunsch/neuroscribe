@@ -1,0 +1,10 @@
+# The bundled frontend is written by `make app-bundle` out of the Go build, so
+# it is a build artefact rather than a second copy of the frontend to keep in
+# step by hand.
+app/src/main/assets/web/
+
+build/
+app/build/
+.gradle/
+local.properties
+*.apk

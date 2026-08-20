@@ -1,7 +1,8 @@
 BINARY  := neuroscribe
 GO      ?= go
 
-.PHONY: all build release deploy run run-open mail-dev pyodide typst vendor assets test vet fmt check hooks clean
+.PHONY: all build release deploy run run-open mail-dev pyodide typst vendor assets test vet fmt check hooks clean \
+	app-bundle app-debug app-release app-publish app-version
 
 all: build
 
@@ -180,6 +181,71 @@ deploy: release
 		echo "--- service did not become healthy; recent log: ---"; \
 		journalctl -u $(DEPLOY_SERVICE) -n 25 --no-pager; exit 1'
 	@echo "deployed and healthy"
+
+# ---- the Android app ----
+#
+# The app carries its own copy of the frontend, so that installing it is the
+# only thing that ever changes it: `make deploy` updates the website and leaves
+# every phone exactly as it was. Publishing a new one is deliberate, and the
+# version it is published under lives in app.version, which is the only file
+# to edit for a release.
+#
+#   make app-version                 what is in app.version right now
+#   make app-bundle                  freeze the frontend into the project
+#   make app-debug                   a signed-with-a-throwaway-key APK to try
+#   make app-release                 the real one, signed with your key
+#   make app-publish                 build it and put it on the server
+#
+# Signing needs a key you make once and keep, and never commit:
+#
+#   keytool -genkeypair -v -keystore ~/.neuroscribe/release.jks \
+#           -alias neuroscribe -keyalg RSA -keysize 4096 -validity 10000
+#
+# Android identifies an app by its signature, so if that key is lost, the next
+# release cannot be installed over this one by anybody: they have to uninstall
+# first, and uninstalling takes the local notes with it. Back it up.
+
+APP_VERSION := $(shell awk -F= '/^VERSION/ {gsub(/[ \t]/,"",$$2); print $$2}' app.version)
+APP_ORIGIN  := $(shell awk -F'= *' '/^ORIGIN/ {print $$2}' app.version)
+APP_ASSETS  := android/app/src/main/assets/web
+APK         := android/app/build/outputs/apk/release/neuroscribe-$(APP_VERSION).apk
+GRADLE      ?= ./gradlew
+
+app-version:
+	@echo "version $(APP_VERSION), syncing with $(APP_ORIGIN)"
+	@echo "edit app.version to change it"
+
+# The frozen frontend, written out of the same binary the server runs, so what
+# the app ships is exactly what the website would have served at this commit.
+app-bundle: build
+	@./$(BINARY) bundle $(APP_ASSETS)
+
+app-debug: app-bundle
+	@cd android && $(GRADLE) assembleDebug
+	@echo "debug APK: android/app/build/outputs/apk/debug/"
+
+app-release: app-bundle
+	@if [ -z "$$NEUROSCRIBE_KEYSTORE" ]; then \
+		echo "NEUROSCRIBE_KEYSTORE is not set — the APK would be unsigned and"; \
+		echo "no phone will install it. See the comments in the Makefile."; \
+		exit 1; \
+	fi
+	@cd android && $(GRADLE) assembleRelease
+	@ls -lh $(APK)
+
+# Puts the APK where the download button points. The server serves whatever is
+# in downloads/, so this is the step that makes a release public — deliberately
+# separate from `make deploy`, which must never change what is on a phone.
+app-publish: app-release
+	$(DEPLOY_SSH) $(DEPLOY_HOST) 'mkdir -p $(DEPLOY_DIR)/downloads'
+	rsync -azv -e "$(DEPLOY_SSH)" $(APK) \
+		$(DEPLOY_HOST):$(DEPLOY_DIR)/downloads/neuroscribe.apk
+	$(DEPLOY_SSH) $(DEPLOY_HOST) 'printf %s "$(APP_VERSION)" \
+		> $(DEPLOY_DIR)/downloads/version.txt \
+		&& chown -R root:neuroscribe $(DEPLOY_DIR)/downloads \
+		&& chmod 750 $(DEPLOY_DIR)/downloads \
+		&& chmod 640 $(DEPLOY_DIR)/downloads/*'
+	@echo "published $(APP_VERSION) — the landing page now offers it"
 
 # Local mail catcher: SMTP on 1025, inbox at http://localhost:8025
 mail-dev:

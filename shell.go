@@ -26,6 +26,7 @@ func (s *server) appShell(w http.ResponseWriter, r *http.Request) {
 		s.renderPage(w, r, "landing.html", landingPage{
 			Registration: s.registrationOpen(),
 			CSRF:         csrfFromContext(r),
+			App:          s.appRelease(),
 		})
 		return
 	}
