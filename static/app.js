@@ -9,6 +9,28 @@ function csrfToken() {
 	return m ? m[1] : "";
 }
 
+// ngCsrfToken is csrfToken for callers that can wait, and the difference
+// matters on a phone. The cookie is minted by any response from the server, so
+// a browser that has one has been talking to it. A shell that came from the
+// cache has not: an app opened from the home screen can be signed in, hold
+// every note it needs, and have no token at all — and sending an empty one is
+// a guaranteed 403 that reads to the reader as "reload the page". One cheap
+// GET is the whole fix; the middleware sets the cookie on the way out.
+let ngCsrfPending = null;
+
+async function ngCsrfToken() {
+	const have = csrfToken();
+	if (have) return have;
+	if (!ngCsrfPending) {
+		ngCsrfPending = fetch("/healthz", {
+			headers: { "X-Requested-With": "neuroscribe" },
+			cache: "no-store",
+		}).catch(function () { /* offline: nothing to send anyway */ })
+			.then(function () { ngCsrfPending = null; return csrfToken(); });
+	}
+	return ngCsrfPending;
+}
+
 /* ---- enhance rendered markdown: KaTeX math + run buttons ---- */
 
 /* Equation numbering & references. Display math may carry \label{key}

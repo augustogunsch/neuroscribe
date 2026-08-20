@@ -264,12 +264,15 @@ function ngCsrf() {
 	return m ? m[1] : "";
 }
 
-function ngPinPost(path, params) {
+async function ngPinPost(path, params) {
+	// ngCsrfToken rather than the cookie straight: an app resumed from the home
+	// screen may not have been given one yet, and sending nothing is a 403.
+	const token = typeof ngCsrfToken === "function" ? await ngCsrfToken() : ngCsrf();
 	const body = new URLSearchParams(params);
-	body.set("csrf_token", ngCsrf());
+	body.set("csrf_token", token);
 	return fetch(path, {
 		method: "POST",
-		headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": ngCsrf() },
+		headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": token },
 		body: body,
 	});
 }

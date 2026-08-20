@@ -335,10 +335,11 @@ async function ngLogout() {
 			}
 		}
 	} catch (err) { /* signing out must happen regardless */ }
+	const token = await ngCsrfToken();
 	await fetch("/logout", {
 		method: "POST",
-		headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": csrfToken() },
-		body: new URLSearchParams({ csrf_token: csrfToken() }),
+		headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": token },
+		body: new URLSearchParams({ csrf_token: token }),
 	}).catch(function () {});
 	location.href = "/login";
 }

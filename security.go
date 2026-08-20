@@ -158,6 +158,17 @@ func (s *server) ensureCSRF(w http.ResponseWriter, r *http.Request) string {
 		HttpOnly: false,
 		SameSite: http.SameSiteLaxMode,
 		Secure:   isHTTPS(r),
+		// As long-lived as the session it guards. Left without one this was a
+		// browser-session cookie, which is a different and much shorter life
+		// than the thirty days of the sign-in beside it — and phones end
+		// browser sessions constantly, an installed app resuming from the home
+		// screen most of all. What the reader saw was an app still signed in,
+		// syncing nothing, complaining about a missing token until the page was
+		// reloaded: the reload was a network fetch, and the network fetch was
+		// what minted the cookie again. Nothing is protected by letting it
+		// expire early — a double-submit token is not a credential, it only has
+		// to be unguessable by another origin, which it stays.
+		MaxAge: int(sessionTTL.Seconds()),
 	})
 	return token
 }

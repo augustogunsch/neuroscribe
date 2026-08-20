@@ -258,7 +258,7 @@ function ngPasswordCard() {
 			const wrapped = await ngSeal(fresh.encKey, storedKey);
 			const resp = await fetch("/auth/password", {
 				method: "POST",
-				headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": csrfToken() },
+				headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": await ngCsrfToken() },
 				body: new URLSearchParams({
 					old_auth_key: old.authKey,
 					new_auth_key: fresh.authKey,
@@ -377,7 +377,7 @@ function ngPrefsCard() {
 	}));
 	return ngEl("section", { class: "type-card" }, [
 		ngEl("h2", { text: ngT("Preferences") }),
-		ngEl("form", { class: "settings-form", onsubmit: function (e) {
+		ngEl("form", { class: "settings-form", onsubmit: async function (e) {
 			e.preventDefault();
 			ngSetPref("lang", lang.value);
 			ngSetPref("theme", theme.value);
@@ -386,7 +386,7 @@ function ngPrefsCard() {
 			// only so another device agrees
 			fetch("/account/prefs", {
 				method: "POST",
-				headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": csrfToken() },
+				headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": await ngCsrfToken() },
 				body: new URLSearchParams({ lang: lang.value, theme: theme.value }),
 			}).catch(function () { /* it will disagree until next time; harmless */ });
 			location.reload();
@@ -516,7 +516,7 @@ function ngDeleteAccountCard() {
 			const derived = await ngDeriveKeys(password.value, params.salt);
 			const resp = await fetch("/account/delete", {
 				method: "POST",
-				headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": csrfToken() },
+				headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": await ngCsrfToken() },
 				body: new URLSearchParams({ password_auth: derived.authKey }),
 			});
 			if (!resp.ok) {

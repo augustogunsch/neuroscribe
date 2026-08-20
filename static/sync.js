@@ -117,7 +117,7 @@ async function ngPush() {
 		};
 		const resp = await fetch("/sync", {
 			method: "POST",
-			headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken() },
+			headers: { "Content-Type": "application/json", "X-CSRF-Token": await ngCsrfToken() },
 			body: JSON.stringify(body),
 		});
 		if (!resp.ok) throw new Error("push failed: " + resp.status);
@@ -217,7 +217,7 @@ async function ngPushBlobs() {
 	for (const blob of pending) {
 		const resp = await fetch("/sync/blob/" + encodeURIComponent(blob.ref), {
 			method: "PUT",
-			headers: { "Content-Type": "application/octet-stream", "X-CSRF-Token": csrfToken() },
+			headers: { "Content-Type": "application/octet-stream", "X-CSRF-Token": await ngCsrfToken() },
 			body: blob.data,
 		});
 		if (resp.status === 404) {

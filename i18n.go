@@ -168,7 +168,12 @@ var translations = map[string]map[string]string{
 
 		// device PIN
 		"Device PIN": "PIN do dispositivo",
-		"A six-digit PIN unlocks this browser instead of your full password. It is stored nowhere: what is kept on this device is your key sealed with the PIN, and it never reaches the server.": "Um PIN de seis dígitos desbloqueia este navegador no lugar da senha completa. Ele não é guardado em lugar nenhum: o que fica neste dispositivo é sua chave lacrada com o PIN, e ele nunca chega ao servidor.",
+		"A six-digit PIN unlocks this device instead of your full password. The PIN travels with your notes, sealed with your key, so signing in again brings this device's lock back — the server holds it and cannot read it. The key sealed under the PIN never leaves this device.": "Um PIN de seis dígitos desbloqueia este dispositivo no lugar da senha completa. O PIN viaja junto com suas anotações, lacrado com sua chave, então entrar de novo traz de volta o bloqueio deste dispositivo — o servidor o guarda e não consegue lê-lo. A chave lacrada sob o PIN nunca sai deste dispositivo.",
+		"Devices with a PIN":        "Dispositivos com PIN",
+		"This device":               "Este dispositivo",
+		"this one":                  "este",
+		"Forget":                    "Esquecer",
+		"app":                       "aplicativo",
 		"New PIN":                   "Novo PIN",
 		"Repeat PIN":                "Repita o PIN",
 		"Lock after":                "Bloquear após",
