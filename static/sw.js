@@ -49,6 +49,7 @@ const NG_PRECACHE = [
 	"/static/settings.js",
 	"/static/export.js",
 	"/static/typst.js",
+	"/static/pin.js",
 	"/static/lock.js",
 	// Loaded by other scripts rather than by the shell, which is exactly why
 	// they were easy to forget: a module worker and a sandboxed frame.

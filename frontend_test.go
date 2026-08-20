@@ -28,7 +28,10 @@ func readAsset(t *testing.T, path string) string {
 // reach the network — but only to confirm the account password when the lock is
 // changed, never to unlock. These assert that boundary structurally.
 func TestPinNeverLeavesTheBrowser(t *testing.T) {
-	js := readAsset(t, "static/lock.js")
+	// Both halves, joined: the boundary is a property of the feature, not of a
+	// file, and reading only one of them could be satisfied by moving a line
+	// into the other.
+	js := readAsset(t, "static/pin.js") + readAsset(t, "static/lock.js")
 
 	// Every network call goes to one of these, and none of them carries the PIN:
 	// two confirm the password (its salt, then its auth key) and one signs out.
@@ -95,7 +98,7 @@ func TestLockDestroysTheKeyAndThePlaintext(t *testing.T) {
 
 // Six digits only survives because guessing is made expensive and finite.
 func TestPinGuessingIsBounded(t *testing.T) {
-	lock := readAsset(t, "static/lock.js")
+	lock := readAsset(t, "static/pin.js")
 	if !strings.Contains(lock, "NG_PIN_MAX_TRIES") || !strings.Contains(lock, "ngClearPin()") {
 		t.Error("wrong PINs are no longer counted towards erasing the record")
 	}
@@ -144,7 +147,7 @@ func TestLockAndStrengthAreWiredIn(t *testing.T) {
 	ts, ck, _ := newTestServer(t)
 
 	app := bodyOf(t, doGet(t, ts, ck, "/"))
-	for _, want := range []string{"/static/lock.js", "/static/strings.js", "data-user="} {
+	for _, want := range []string{"/static/pin.js", "/static/lock.js", "/static/strings.js", "data-user="} {
 		if !strings.Contains(app, want) {
 			t.Errorf("app layout is missing %s", want)
 		}
@@ -173,7 +176,7 @@ func TestLockAndStrengthAreWiredIn(t *testing.T) {
 // The shell is one cached document for every page, so a CSRF token read from
 // its markup goes stale. Every client-side reader must use the cookie.
 func TestCSRFTokenIsReadFromTheCookie(t *testing.T) {
-	for _, asset := range []string{"static/lock.js", "static/app.js", "static/sync.js", "static/settings.js", "static/router.js"} {
+	for _, asset := range []string{"static/pin.js", "static/lock.js", "static/app.js", "static/sync.js", "static/settings.js", "static/router.js"} {
 		src := readAsset(t, asset)
 		if strings.Contains(src, `meta[name="csrf-token"]`) {
 			t.Errorf("%s still reads the CSRF token from a meta tag; the cached shell makes that stale", asset)

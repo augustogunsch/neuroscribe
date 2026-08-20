@@ -46,7 +46,7 @@ var recordKinds = map[string]bool{
 	// is sealed with the data key, so what the server holds is the fact that
 	// a lock exists and nothing about it — not the digits, and above all not
 	// the data key wrapped under them, which never leaves the device that
-	// set it. See the note in static/lock.js.
+	// set it. See the note in static/pin.js.
 	"pin": true,
 }
 
