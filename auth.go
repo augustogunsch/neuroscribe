@@ -156,6 +156,16 @@ func (s *server) showLogin(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// identifierClause matches an account by username or, when the identifier
+// carries an "@", by email — usernames cannot contain one, so the two spaces
+// never collide and nothing has to guess.
+func identifierClause(identifier string) string {
+	if strings.Contains(identifier, "@") {
+		return "email = ? COLLATE NOCASE"
+	}
+	return "username = ? COLLATE NOCASE"
+}
+
 func (s *server) doLogin(w http.ResponseWriter, r *http.Request) {
 	username := strings.TrimSpace(r.FormValue("username"))
 	// the browser sends a key derived from the password, never the password
@@ -178,7 +188,7 @@ func (s *server) doLogin(w http.ResponseWriter, r *http.Request) {
 	var passHash, wrappedKey string
 	var verified int
 	err := s.db.QueryRow(
-		"SELECT id, pass_hash, email_verified, wrapped_key FROM users WHERE username = ? COLLATE NOCASE",
+		"SELECT id, pass_hash, email_verified, wrapped_key FROM users WHERE "+identifierClause(username),
 		username).Scan(&userID, &passHash, &verified, &wrappedKey)
 	if err != nil {
 		// burn the same time as a real bcrypt check to avoid user enumeration
@@ -261,7 +271,7 @@ func (s *server) doLogin(w http.ResponseWriter, r *http.Request) {
 func (s *server) authParams(w http.ResponseWriter, r *http.Request) {
 	username := strings.TrimSpace(r.URL.Query().Get("username"))
 	var salt string
-	err := s.db.QueryRow("SELECT kdf_salt FROM users WHERE username = ? COLLATE NOCASE", username).Scan(&salt)
+	err := s.db.QueryRow("SELECT kdf_salt FROM users WHERE "+identifierClause(username), username).Scan(&salt)
 	if err != nil || salt == "" {
 		mac := hmac.New(sha256.New, s.altcha.key)
 		mac.Write([]byte("decoy-salt:" + strings.ToLower(username)))

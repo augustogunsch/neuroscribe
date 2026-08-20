@@ -37,8 +37,9 @@ func newTestServerFull(t *testing.T) (*httptest.Server, *http.Cookie, *sql.DB, *
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`INSERT INTO users (username, pass_hash, kdf_salt, wrapped_key, email_verified)
-		VALUES ('tester', ?, ?, ?, 1)`, string(hash), keys.Get("kdf_salt"), keys.Get("wrapped_key")); err != nil {
+	if _, err := db.Exec(`INSERT INTO users (username, pass_hash, kdf_salt, wrapped_key, email, email_verified)
+		VALUES ('tester', ?, ?, ?, 'tester@example.com', 1)`,
+		string(hash), keys.Get("kdf_salt"), keys.Get("wrapped_key")); err != nil {
 		t.Fatal(err)
 	}
 	token := newSessionToken()
@@ -940,5 +941,50 @@ func TestPasswordsHaveNoNameToTravelUnder(t *testing.T) {
 	}
 	if strings.Contains(js, "current.value,") && strings.Contains(js, "body: new URLSearchParams({ password") {
 		t.Error("a raw password appears in a request body")
+	}
+}
+
+// Uniqueness has to hold in the schema, not just in the sign-up handler: the
+// login lookup is case-insensitive, so two accounts differing only in case
+// would both answer to one identifier.
+func TestUsernamesAreUniqueRegardlessOfCase(t *testing.T) {
+	_, _, db := newTestServer(t)
+	_, err := db.Exec(`INSERT INTO users (username, pass_hash, email_verified)
+		VALUES ('TESTER', 'x', 1)`)
+	if err == nil {
+		t.Fatal("a second account differing only in username case was accepted")
+	}
+}
+
+// The email is as much "who am I" as the username; both must open the same
+// account, and asking for an unknown email must be indistinguishable from a
+// known one (the decoy salt), or sign-in doubles as an enumeration oracle.
+func TestLoginByEmail(t *testing.T) {
+	ts, ck, _ := newTestServer(t)
+
+	var salt string
+	// /auth/params answers for the email exactly as for the username
+	resp := doGet(t, ts, nil, "/auth/params?username=tester%40example.com")
+	var params struct {
+		Salt string `json:"salt"`
+	}
+	if err := json.Unmarshal([]byte(bodyOf(t, resp)), &params); err != nil || params.Salt == "" {
+		t.Fatalf("no salt for the email identifier: %v", err)
+	}
+	salt = params.Salt
+
+	authKey, _ := testDeriveKeys(t, "test-password", salt)
+	login := doPost(t, ts, ck, "/login", url.Values{
+		"username": {"tester@example.com"},
+		"auth_key": {authKey},
+	})
+	if login.StatusCode != http.StatusSeeOther && login.StatusCode != http.StatusOK {
+		t.Fatalf("email login refused: %d %s", login.StatusCode, bodyOf(t, login))
+	}
+
+	// unknown addresses get a decoy salt, never an error
+	unknown := doGet(t, ts, nil, "/auth/params?username=nobody%40example.com")
+	if err := json.Unmarshal([]byte(bodyOf(t, unknown)), &params); err != nil || params.Salt == "" {
+		t.Fatal("an unknown email is distinguishable at /auth/params")
 	}
 }

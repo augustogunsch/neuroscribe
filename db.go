@@ -25,6 +25,11 @@ CREATE TABLE IF NOT EXISTS users (
 	created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(lower(email)) WHERE email != '';
+-- The column's own UNIQUE is case-sensitive; sign-in matches case-insensitively,
+-- so uniqueness must too, or "Bob" and "bob" are two accounts that one login
+-- reaches. Registration also refuses "@" in usernames, which keeps this space
+-- disjoint from emails — the reason signing in with either is unambiguous.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(lower(username));
 
 -- Everything the reader owns lives here as one opaque record per note,
 -- chapter, folder, note type or image. There are no tables for parents,

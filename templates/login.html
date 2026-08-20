@@ -33,7 +33,7 @@
 	<form method="post" action="/login" class="login-form" data-e2e-login
 		data-msg-wrong="{{t "Wrong username or password."}}">
 		<input type="hidden" name="csrf_token" value="{{.CSRF}}">
-		<label class="meta-label">{{t "Username"}}
+		<label class="meta-label">{{t "Username or email"}}
 			<input type="text" name="username" required autofocus autocomplete="username">
 		</label>
 		<label class="meta-label">{{t "Password"}}

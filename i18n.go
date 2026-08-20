@@ -293,6 +293,8 @@ var translations = map[string]map[string]string{
 
 		"Every supported function and symbol": "Todas as funções e símbolos suportados",
 
+		"Username or email": "Usuário ou e-mail",
+
 		// code / run
 		"Run":                "Executar",
 		"Running…":           "Executando…",
