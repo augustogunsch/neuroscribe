@@ -82,16 +82,36 @@ html, body {
 
 /* ---- sidebar ---- */
 
+/* A column, so the tree takes the space that is left and Settings, Trash and
+   the account sit at the bottom of the window rather than immediately under
+   the last note. The tree scrolls on its own instead of the whole sidebar
+   scrolling, which also means the footer stays put in a long tree. */
 .sidebar {
 	width: var(--sidebar-w, 270px);
 	flex-shrink: 0;
 	background: var(--bg-soft);
 	border-right: 1px solid var(--border);
 	padding: 1rem 0.75rem;
-	overflow-y: auto;
+	overflow: hidden;
 	position: sticky;
 	top: 0;
 	height: 100vh;
+	display: flex;
+	flex-direction: column;
+}
+
+/* min-height: 0 is what lets this shrink at all — a flex item defaults to
+   min-height: auto, which is its content, and the scrollbar would never
+   appear. */
+.sidebar > .treewrap {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.sidebar > .brand,
+.sidebar > .sidebar-actions {
+	flex-shrink: 0;
 }
 
 .sidebar-toggle {
@@ -478,7 +498,11 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
 /* ---- sidebar footer ---- */
 
 .sidebar-footer {
-	margin-top: 1.2rem;
+	/* auto rather than a fixed gap: it takes whatever room the tree does not,
+	   which is what puts it against the bottom edge on a short tree and leaves
+	   it just below the tree on a long one. */
+	margin-top: auto;
+	flex-shrink: 0;
 	border-top: 1px solid var(--border);
 	padding-top: 0.7rem;
 	display: flex;
