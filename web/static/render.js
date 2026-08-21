@@ -56,6 +56,8 @@ function ngDressCodeBlocks(root) {
 		const block = document.createElement("div");
 		block.className = "codeblock";
 		block.dataset.lang = lang;
+		// the marker set by the fence, moved up where enhance can see it
+		if (code.classList.contains("ng-plot")) block.classList.add("is-plot");
 		const head = document.createElement("div");
 		head.className = "codehead";
 		const label = document.createElement("span");
@@ -107,7 +109,12 @@ const NG_SAFE_URI = /^(?:(?:https?|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.:-]|$))/i;
 // Syntax highlighting needs the language marker Markdown puts on a fence, and
 // nothing else: an arbitrary class from a note could borrow this app's own
 // styling and dress itself up as part of the interface.
+//
+// ng-plot joins it as the one marker a fence may set deliberately (see
+// NG_FENCE_MARKERS). It is named here rather than pattern-matched so that the
+// set of classes a note can put on the page stays a list somebody chose.
 const NG_LANG_CLASS = /^language-[A-Za-z0-9+#._-]+$/;
+const NG_CODE_MARKS = ["ng-plot"];
 
 let ngPurifyHooked = false;
 
@@ -120,7 +127,8 @@ function ngSanitizer() {
 		DOMPurify.addHook("afterSanitizeAttributes", function (node) {
 			if (node.hasAttribute && node.hasAttribute("class")) {
 				const kept = String(node.getAttribute("class")).split(/\s+/)
-					.filter((c) => node.tagName === "CODE" && NG_LANG_CLASS.test(c));
+					.filter((c) => node.tagName === "CODE" &&
+						(NG_LANG_CLASS.test(c) || NG_CODE_MARKS.indexOf(c) !== -1));
 				if (kept.length) node.setAttribute("class", kept.join(" "));
 				else node.removeAttribute("class");
 			}
@@ -136,13 +144,44 @@ function ngSanitizer() {
 	return DOMPurify;
 }
 
+/* A fence may carry one extra word: ```python plot.
+ *
+ * marked keeps the whole info string on the token but writes only the first
+ * word into the class, and the marker cannot travel as a data attribute
+ * because the sanitizer strips those on purpose. So it travels as a class —
+ * and exactly one class, from a fixed list. The info string is note content,
+ * and note content does not get to choose what classes appear in the page:
+ * anything other than the word below is simply not a marker.
+ */
+const NG_FENCE_MARKERS = { plot: "ng-plot" };
+
+function ngMarkedRenderer() {
+	const renderer = new marked.Renderer();
+	// marked 12 passes (code, infostring, escaped) positionally. Taking the
+	// arguments through rather than naming them keeps this working if a later
+	// version hands over a token object instead: the marker is then simply not
+	// found, and a plot fence degrades to an ordinary code block.
+	const base = renderer.code.bind(renderer);
+	renderer.code = function (code, infostring, escaped) {
+		const html = base(code, infostring, escaped);
+		const words = String(infostring || "").trim().split(/\s+/).slice(1);
+		const marks = words.map(function (w) { return NG_FENCE_MARKERS[w.toLowerCase()]; })
+			.filter(Boolean);
+		if (!marks.length) return html;
+		return html.replace(/<code class="language-([^"]*)"/,
+			'<code class="language-$1 ' + marks.join(" ") + '"');
+	};
+	return renderer;
+}
+
 // renderMarkdown turns note text into DOM. The sanitized result is taken as a
 // fragment rather than a string: assigning HTML back into innerHTML would make
 // the browser re-parse what was just cleaned, which is the window mutation-XSS
 // lives in. Nothing here is ever serialized again.
 function ngRenderMarkdown(target, source) {
 	const protectedSrc = ngProtectMath(source);
-	const dirty = marked.parse(protectedSrc.text, { gfm: true, breaks: false });
+	const dirty = marked.parse(protectedSrc.text,
+		{ gfm: true, breaks: false, renderer: ngMarkedRenderer() });
 	const clean = ngSanitizer().sanitize(dirty, {
 		ALLOWED_TAGS: NG_ALLOWED_TAGS,
 		ALLOWED_ATTR: NG_ALLOWED_ATTR,
@@ -232,5 +271,10 @@ function enhance(root) {
 		btn.textContent = "▶ " + ngT("Run");
 		btn.addEventListener("click", function () { runSnippet(lang, block, btn); });
 		head.appendChild(btn);
+		// A block marked as a plot draws itself. A figure that has to be
+		// clicked into existence is a demo, not an illustration — and the
+		// marker is the author saying they want the picture. Everything else
+		// still waits to be asked.
+		if (block.classList.contains("is-plot")) ngDrawPlot(lang, block, btn);
 	});
 }

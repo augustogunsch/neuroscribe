@@ -67,15 +67,19 @@ FETCH := scripts/fetch.sh
 # never committed.
 PYODIDE_VERSION := 0.26.4
 PYODIDE_BASE := https://cdn.jsdelivr.net/pyodide/v$(PYODIDE_VERSION)/full
-PYODIDE_FILES := pyodide.js pyodide.asm.js pyodide.asm.wasm python_stdlib.zip \
-	pyodide-lock.json \
-	numpy-1.26.4-cp312-cp312-pyodide_2024_0_wasm32.whl \
-	scipy-1.12.0-cp312-cp312-pyodide_2024_0_wasm32.whl \
-	pandas-2.2.0-cp312-cp312-pyodide_2024_0_wasm32.whl \
-	sympy-1.12-py3-none-any.whl mpmath-1.3.0-py3-none-any.whl \
-	openblas-0.3.26.zip six-1.16.0-py2.py3-none-any.whl \
-	pytz-2024.1-py2.py3-none-any.whl \
-	python_dateutil-2.9.0.post0-py2.py3-none-any.whl
+# Plotting. matplotlib is not part of the base download because a note that
+# never draws anything should not pay for it — but it is the only thing here
+# that can produce a chart, a vector field or a 3D surface, and it composes
+# with the numpy, scipy and sympy already alongside it. ~12 MB.
+MPL_FILES := \
+	cycler-0.12.1-py3-none-any.whl \
+	fonttools-4.51.0-py3-none-any.whl \
+	kiwisolver-1.4.5-cp312-cp312-pyodide_2024_0_wasm32.whl \
+	matplotlib-3.5.2-cp312-cp312-pyodide_2024_0_wasm32.whl \
+	matplotlib_pyodide-0.2.2-py3-none-any.whl \
+	packaging-23.2-py3-none-any.whl \
+	pillow-10.2.0-cp312-cp312-pyodide_2024_0_wasm32.whl \
+	pyparsing-3.1.2-py3-none-any.whl
 
 pyodide:
 	@for f in $(PYODIDE_FILES); do \
@@ -257,3 +261,14 @@ mail-dev:
 
 clean:
 	rm -f $(BINARY)
+
+PYODIDE_FILES := pyodide.js pyodide.asm.js pyodide.asm.wasm python_stdlib.zip \
+	pyodide-lock.json \
+	numpy-1.26.4-cp312-cp312-pyodide_2024_0_wasm32.whl \
+	scipy-1.12.0-cp312-cp312-pyodide_2024_0_wasm32.whl \
+	pandas-2.2.0-cp312-cp312-pyodide_2024_0_wasm32.whl \
+	sympy-1.12-py3-none-any.whl mpmath-1.3.0-py3-none-any.whl \
+	openblas-0.3.26.zip six-1.16.0-py2.py3-none-any.whl \
+	pytz-2024.1-py2.py3-none-any.whl \
+	python_dateutil-2.9.0.post0-py2.py3-none-any.whl \
+	$(MPL_FILES)

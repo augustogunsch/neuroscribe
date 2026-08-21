@@ -201,11 +201,19 @@ function ngTypstRenderer(ctx) {
 				out.push("#quote(block: true)[\n" + inner.source() + "]\n");
 				return;
 			}
-			case "code":
+			case "code": {
 				out.push("#raw(block: true, lang: " +
 					(t.lang ? ngTypstStr(String(t.lang).split(/\s+/)[0]) : "none") +
 					", " + ngTypstStr(t.text) + ")\n");
+				// A fence marked as a plot carries a picture in the note, and the
+				// PDF shows the same one — the same SVG, in fact, drawn once in
+				// the browser and handed to both. See ngCollectPlots.
+				(ctx.plots[t.text] || []).forEach(function (svg) {
+					const name = ctx.embedSVG(svg);
+					if (name) out.push("#align(center, image(" + ngTypstStr(name) + ", width: 85%))\n");
+				});
 				return;
+			}
 			case "hr":
 				out.push("#line(length: 100%, stroke: 0.5pt + luma(160))\n");
 				return;
@@ -316,8 +324,19 @@ const NG_TYPST_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/svg
 // image files the compiler will need alongside it.
 function ngNoteToTypst(note, opts) {
 	const files = {};
+	let plotSeq = 0;
 	const ctx = {
 		math: [],
+		plots: (opts && opts.plots) || {},
+		// Figures are not note images: they have no record and no address,
+		// they were drawn a moment ago from the note's own code. They still
+		// reach the compiler the same way, as a file beside the document.
+		embedSVG: (svg) => {
+			if (typeof svg !== "string" || !svg) return "";
+			const name = "/img/plot-" + (++plotSeq) + ".svg";
+			files[name] = new TextEncoder().encode(svg);
+			return name;
+		},
 		embed: (href) => {
 			const m = /^\/images\/([A-Za-z0-9_-]+)/.exec(String(href || ""));
 			if (!m) return "";
@@ -375,12 +394,57 @@ function ngNoteToTypst(note, opts) {
 // ngNotePDF turns one decrypted note into PDF bytes. A formula mitex cannot
 // translate would otherwise fail the whole document, so a second attempt drops
 // to showing the LaTeX verbatim: an imperfect PDF beats no PDF.
+/* ngCollectPlots draws every plot fence in a note, ahead of the conversion.
+ *
+ * The Markdown walker is synchronous and drawing is not — it is a round trip
+ * to an interpreter in a sandboxed frame — so the figures are gathered first
+ * and the walker only looks them up. Anything already drawn on screen comes
+ * straight from the session cache, which is the common case: the usual reason
+ * to export a note is that you were just reading it.
+ */
+async function ngCollectPlots(note, onStatus) {
+	const plots = {};
+	for (const chapter of note.chapters || []) {
+		let tokens;
+		try {
+			tokens = marked.lexer(String(chapter.content || ""), { gfm: true });
+		} catch (err) {
+			continue;
+		}
+		for (const t of tokens) {
+			if (t.type !== "code" || plots[t.text]) continue;
+			const words = String(t.lang || "").trim().split(/\s+/);
+			const lang = typeof runnableLang === "function" ? runnableLang(words[0]) : "";
+			if (!lang || words.indexOf("plot") === -1) continue;
+			if (typeof ngPlotFigures !== "function") continue;
+			const figures = await ngPlotFigures(lang, t.text, onStatus);
+			// a plot that will not draw leaves the code in the PDF and no
+			// picture, which is the same thing the note shows
+			if (Array.isArray(figures) && figures.length) plots[t.text] = figures;
+		}
+	}
+	return plots;
+}
+
 async function ngNotePDF(note, opts) {
-	const built = ngNoteToTypst(note, opts);
+	const plots = await ngCollectPlots(note, opts && opts.onStatus);
+	const withPlots = ngNoteToTypst(note, Object.assign({}, opts, { plots: plots }));
 	try {
-		return await ngTypstSend(built.source, built.files);
+		return await ngTypstSend(withPlots.source, withPlots.files);
 	} catch (err) {
-		return await ngTypstSend(ngTypstWithoutMath(built.source), built.files);
+		// Every formula becomes literal text: a note whose maths the compiler
+		// refuses is still worth having as a PDF.
+		try {
+			return await ngTypstSend(ngTypstWithoutMath(withPlots.source), withPlots.files);
+		} catch (err2) {
+			// And a figure the compiler will not take must not cost the whole
+			// document either. The compiler parses the SVG rather than passing
+			// it through, so a malformed one fails the export outright — the
+			// note is worth more than the picture.
+			if (!Object.keys(plots).length) throw err2;
+			const plain = ngNoteToTypst(note, Object.assign({}, opts, { plots: {} }));
+			return await ngTypstSend(ngTypstWithoutMath(plain.source), plain.files);
+		}
 	}
 }
 

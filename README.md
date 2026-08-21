@@ -176,6 +176,12 @@ gracefully without them, and every file is checked against `assets.sha256`.
   neither can reach the note: execution happens inside a worker, inside a
   frame sandboxed to an opaque origin, with a 60 s (Python) / 10 s
   (JavaScript) limit that terminates a runaway loop.
+- **Plots** — add `plot` to a Python fence and the block draws itself when the
+  note opens, with matplotlib: cartesian charts, function graphs, vector
+  fields, contours, and 3D surfaces. The figure is SVG, so it stays vector in
+  the note and in the PDF — the same bytes go into both, which is why they
+  match. Drawn in the same sandbox as any other snippet; nothing is sent
+  anywhere. See *Drawing* below.
 - **PDF export** — the whole note (all chapters as numbered headings, with a
   title page, metadata block and table of contents), converted Markdown→Typst
   and compiled in the browser; attached images are embedded and code keeps its
@@ -280,6 +286,64 @@ deploy/            nginx configuration
 docs/              deployment and Android guides
 scripts/           fetch.sh, which installs nothing unpinned
 ```
+
+## Drawing
+
+Put `plot` after the language on a Python fence:
+
+````markdown
+```python plot
+import numpy as np, matplotlib.pyplot as plt
+
+x = np.linspace(-2*np.pi, 2*np.pi, 400)
+plt.plot(x, np.sin(x), label="sin x")
+plt.plot(x, np.cos(x), "--", label="cos x")
+plt.axhline(0, color="0.6", lw=0.8)
+plt.legend(); plt.grid(True)
+plt.title("Trigonometric functions")
+```
+````
+
+The block draws itself when the note opens and the figure appears under the
+code. A `python` fence without the marker keeps its *Run* button and stays
+inert until you press it — the marker is how you say "this one is a picture".
+
+Anything matplotlib can draw works, and numpy, scipy and sympy are already
+alongside it. A vector field:
+
+```python plot
+import numpy as np, matplotlib.pyplot as plt
+Y, X = np.mgrid[-3:3:20j, -3:3:20j]
+plt.quiver(X, Y, -Y, X)
+plt.gca().set_aspect("equal")
+```
+
+A surface in 3D:
+
+```python plot
+import numpy as np, matplotlib.pyplot as plt
+fig = plt.figure()
+ax = fig.add_subplot(projection="3d")
+X, Y = np.meshgrid(np.linspace(-3, 3, 60), np.linspace(-3, 3, 60))
+ax.plot_surface(X, Y, np.sin(X**2 + Y**2), cmap="viridis")
+```
+
+Worth knowing:
+
+- **It needs the Python runtime.** `make pyodide` fetches it, matplotlib
+  included (~12 MB of the 139 MB). Without it a plot block says so and the
+  PDF keeps the code and omits the picture.
+- **The first plot in a session is slow** — a few seconds while Python starts
+  and matplotlib loads. After that they are quick, and a figure already drawn
+  is remembered until the app is locked or reloaded.
+- **The PDF gets the same SVG**, so it is vector and it matches what you saw.
+  Exporting a note you have not opened draws its plots first, which takes as
+  long as opening it would have.
+- **The code appears in the PDF too**, under the same rules as any other
+  fence. Move it to its own chapter, or out of the note, if you want the
+  figure alone.
+- **A 3D surface is a large picture.** The 60×60 mesh above is about 250 KB of
+  SVG; halve the resolution if a note carries many of them.
 
 ## How offline works
 

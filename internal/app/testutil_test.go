@@ -316,7 +316,22 @@ func makeListValue(t *testing.T, makefile, name string) []string {
 		}
 	}
 	fields := strings.Fields(body.String())
-	return fields[2:] // drop the variable name and ":="
+	fields = fields[2:] // drop the variable name and ":="
+
+	// A list may be built from other lists — $(MPL_FILES) inside
+	// PYODIDE_FILES. Expanding them here is what keeps this test checking the
+	// files that are actually downloaded rather than the literal text of one
+	// line, which would quietly stop covering anything the day a list is split
+	// in two.
+	var out []string
+	for _, f := range fields {
+		if strings.HasPrefix(f, "$(") && strings.HasSuffix(f, ")") {
+			out = append(out, makeListValue(t, makefile, strings.TrimSuffix(strings.TrimPrefix(f, "$("), ")"))...)
+			continue
+		}
+		out = append(out, f)
+	}
+	return out
 }
 
 // allowedTagsBlock returns the NG_ALLOWED_TAGS literal.

@@ -273,6 +273,14 @@ var translations = map[string]map[string]string{
 		"error":              "erro",
 		"(no output)":        "(sem saída)",
 
+		// plots
+		"(figure only)":                "(apenas a figura)",
+		"Drawing…":                     "Desenhando…",
+		"Figure":                       "Figura",
+		"That snippet drew no figure.": "Esse trecho não desenhou nenhuma figura.",
+		"The plot could not be drawn.": "Não foi possível desenhar o gráfico.",
+		"it took too long":             "demorou demais",
+
 		// types page
 		"Note types": "Tipos de nota",
 		"Each note has a type. A type defines extra metadata fields, every note always has a title and a description.": "Cada nota tem um tipo. Um tipo define campos extras de metadados, toda nota sempre tem título e descrição.",

@@ -1258,3 +1258,19 @@ body.is-locked { overflow: hidden; }
 	margin: 0 auto;
 	font-size: 0.86rem;
 }
+
+/* a plot returned by a snippet */
+.run-figure {
+	display: block;
+	max-width: 100%;
+	margin: 0.7rem auto 0;
+	background: #fff;
+	border-radius: 6px;
+	padding: 0.4rem;
+}
+
+/* the figure a ```python plot fence draws for itself */
+.plot-figure {
+	display: block;
+	padding: 0.4rem 0.6rem 0.6rem;
+}
