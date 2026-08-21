@@ -168,7 +168,12 @@ gracefully without them, and every file is checked against `assets.sha256`.
   references resolve within a chapter (numbered 1, 2, …); in the exported
   PDF they resolve across the whole note, printing as "Equation 1" and
   linking to it.
-- **Code** — fenced blocks highlighted with chroma for any language.
+- **Code** — fenced blocks are highlighted in the browser by highlight.js,
+  across the 36 languages its common build knows. Name the language on the
+  fence: an unlabelled block, or one naming something it does not know, is left
+  as plain text rather than guessed at, because a wrong guess colours words
+  that mean nothing. The palette is GitHub's, light and dark, generated from
+  chroma by the server so both themes are one file.
 - **Snippets** — `python` and `javascript` blocks get a *Run* button, and both
   languages execute in the browser. Python is CPython compiled to WebAssembly
   with numpy, scipy, sympy and pandas available; JavaScript is the browser's

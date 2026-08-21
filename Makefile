@@ -211,6 +211,8 @@ vendor:
 	@$(FETCH) $(VENDOR_NPM)/marked@12.0.2/marked.min.js         web/static/vendor/marked.min.js
 	@$(FETCH) $(VENDOR_NPM)/katex@0.16.21/dist/katex.min.js     web/static/vendor/katex.min.js
 	@$(FETCH) $(VENDOR_NPM)/katex@0.16.21/dist/katex.min.css    web/static/vendor/katex.min.css
+	@$(FETCH) $(VENDOR_NPM)/@highlightjs/cdn-assets@11.10.0/highlight.min.js \
+		web/static/vendor/highlight.min.js
 	@$(FETCH) $(VENDOR_NPM)/altcha@1.0.6/dist/altcha.min.js     web/static/vendor/altcha.min.js
 	@$(FETCH) $(VENDOR_NPM)/zxcvbn@4.4.2/dist/zxcvbn.js         web/static/vendor/zxcvbn.min.js
 	@echo "vendor libraries verified against assets.sha256"

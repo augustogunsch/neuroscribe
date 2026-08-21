@@ -95,4 +95,6 @@ c0845096a7c4a6741f362ac506c94c1c7d27dc603bcc1bf64a587f76f2dbe3a1  static/vendor/
 0c7351312859d2b8a4ac4d8851f97ca238083948d3305f2842212cc3d89d8757  static/vendor/katex.min.css
 # Altcha 1.0.6 — cdn.jsdelivr.net/npm/altcha@1.0.6/dist/altcha.min.js
 989ae6cf08bb5bfc8a7a8910640758c67662a606bb164d66e893a6ed4e6d0a1c  static/vendor/altcha.min.js
+# highlight.js 11.10.0 — cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.10.0/highlight.min.js
+471ef9ae90c407af440fcdc48edfeeb562106b3267bd12d99071c162fb52ed32  static/vendor/highlight.min.js
 f42c651f40506acb6b662490f338dd47a5951d3312039c4ab8fe5090484f351a  static/vendor/zxcvbn.min.js

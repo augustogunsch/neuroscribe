@@ -61,6 +61,7 @@ const NG_PRECACHE = [
 	"/static/runner.html",
 	"/static/runner.js",
 	"/static/logo.svg",
+	"/static/vendor/highlight.min.js",
 	"/static/vendor/katex.min.css",
 	"/static/vendor/katex.min.js",
 	"/static/vendor/marked.min.js",
