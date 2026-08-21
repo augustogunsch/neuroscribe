@@ -455,6 +455,9 @@ async function ngBootApp() {
 	// only just have arrived with it — a device signing in fresh, or one whose
 	// storage was cleared, learns its own PIN from the account here.
 	if (typeof ngRestorePin === "function") await ngRestorePin();
+	// Start Python now if this device draws plots, so that opening a note with
+	// a figure in it does not begin with a two-second wait. See run.js.
+	if (typeof ngPrewarmPlots === "function") ngPrewarmPlots();
 }
 
 document.addEventListener("DOMContentLoaded", ngBootApp);

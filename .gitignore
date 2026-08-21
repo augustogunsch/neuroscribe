@@ -7,7 +7,9 @@ neuroscribe.db-*
 .env.*
 !.env.example
 backups/
-/pyodide/
-/typst/
+# Both may be a directory or, while developing, a symlink to one fetched
+# elsewhere; the trailing slash would only match the directory.
+/pyodide
+/typst
 dist/
 downloads/

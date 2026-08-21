@@ -93,6 +93,54 @@ func TestPlotsRunWhereSnippetsRun(t *testing.T) {
 	}
 }
 
+// The reader asked for the picture, not the listing. A figure hides its source
+// behind a control, and the PDF must not print what the note folded away.
+func TestTheSourceStaysFolded(t *testing.T) {
+	run := readAsset(t, "static/run.js")
+	if !strings.Contains(run, "source.hidden = true") {
+		t.Error("a plot's code is no longer hidden by default")
+	}
+	if !strings.Contains(run, `document.createElement("figure")`) {
+		t.Error("a plot is no longer a figure; it has gone back to being a decorated code block")
+	}
+
+	typst := readAsset(t, "static/typst.js")
+	if !strings.Contains(typst, "#figure(") {
+		t.Error("the PDF no longer emits a real figure")
+	}
+	// The listing must be skipped for a drawn plot, not merely followed by an
+	// image: printing both is what this change exists to stop.
+	at := strings.Index(typst, "const drawn = ctx.plots[t.text];")
+	if at < 0 {
+		t.Fatal("the plot branch in the code case is gone")
+	}
+	rest := typst[at:]
+	fig := strings.Index(rest, "#figure(")
+	raw := strings.Index(rest, "#raw(block: true")
+	if fig < 0 || raw < 0 || fig > raw {
+		t.Error("a drawn plot no longer returns before the raw listing is emitted")
+	}
+}
+
+// Two seconds of interpreter start-up is the whole cost of a figure; fifty
+// milliseconds is the drawing. Paying it before anyone asks is the difference.
+func TestPythonIsWarmedBeforeItIsNeeded(t *testing.T) {
+	run := readAsset(t, "static/run.js")
+	for _, needed := range []string{"ngPrewarmPlots", "ngWarmPython", "requestIdleCallback"} {
+		if !strings.Contains(run, needed) {
+			t.Errorf("%s is gone; the first figure of a session pays the full start-up", needed)
+		}
+	}
+	// Only devices that draw. Starting a Python interpreter for someone who
+	// never plots is a large download in exchange for nothing.
+	if !strings.Contains(run, "NG_PLOT_FLAG") || !strings.Contains(run, "dataset.runner") {
+		t.Error("the warm-up is no longer conditional; it would run on devices that never plot")
+	}
+	if !strings.Contains(readAsset(t, "static/router.js"), "ngPrewarmPlots()") {
+		t.Error("nothing calls the warm-up at boot")
+	}
+}
+
 // The same SVG goes into the note and into the PDF. That is the whole reason
 // the two agree, so the PDF must take the figure as a file and not re-draw it.
 func TestThePDFEmbedsTheSameFigure(t *testing.T) {

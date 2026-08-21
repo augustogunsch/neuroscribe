@@ -274,6 +274,9 @@ var translations = map[string]map[string]string{
 		"(no output)":        "(sem saída)",
 
 		// plots
+		"Figure %s":                    "Figura %s",
+		"Show the code that drew this": "Mostrar o código que desenhou isto",
+		"Hide the code":                "Ocultar o código",
 		"Add plot to a Python block and it draws itself with matplotlib — charts, function graphs, vector fields and 3D surfaces — in the note and in the exported PDF.":        "Escreva plot num bloco Python e ele se desenha sozinho com matplotlib — gráficos, funções, campos vetoriais e superfícies em 3D — na anotação e no PDF exportado.",
 		"Any Python fence with the word plot after the language draws itself when the note opens. A plain python fence keeps its Run button and stays put until you press it.":  "Qualquer bloco Python com a palavra plot depois da linguagem se desenha ao abrir a anotação. Um bloco python comum mantém o botão Executar e só roda quando você aperta.",
 		"The first one in a session takes a few seconds while Python starts. Everything numpy, scipy and sympy can compute is available to it, and nothing leaves this device.": "O primeiro leva alguns segundos enquanto o Python inicia. Tudo que numpy, scipy e sympy calculam está disponível, e nada sai deste dispositivo.",

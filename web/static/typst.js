@@ -88,13 +88,36 @@ function ngMathLabel(name) {
 	return clean ? "eq-" + clean : "";
 }
 
+// Typst labels are bare identifiers, and a figure's label comes from a note,
+// so it is reduced to something Typst will accept and cannot collide with the
+// equation labels living in the same namespace.
+function ngFigureLabel(name) {
+	const clean = String(name).replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+	return clean ? "fig-" + clean : "";
+}
+
+// A figure is referred to in the prose as @label. Splitting on it before the
+// escaping matters: ngTypstText escapes "@", so anything left to that stage
+// would print the label instead of pointing at the picture.
+const NG_FIG_REF_SPLIT = /@([A-Za-z0-9_-]{1,64})\b/;
+
 // Prose, as opposed to a title or a label: the same escaping, plus \eqref{x}
-// turned into a real Typst reference so it prints the equation's number.
-function ngTypstProse(s) {
+// and @figure turned into real Typst references so they print the number.
+function ngTypstProse(s, figures) {
 	return String(s == null ? "" : s).split(NG_MATH_REF_SPLIT).map((part, i) => {
-		if (i % 2 === 0) return ngTypstText(part);
+		if (i % 2 === 0) return ngTypstFigRefs(part, figures);
 		const label = ngMathLabel(part);
 		return label ? "@" + label : "";
+	}).join("");
+}
+
+function ngTypstFigRefs(text, figures) {
+	if (!figures || !Object.keys(figures).length) return ngTypstText(text);
+	return String(text).split(NG_FIG_REF_SPLIT).map((part, i) => {
+		if (i % 2 === 0) return ngTypstText(part);
+		// only a label this note actually defines is a reference; anything
+		// else was an "@" the author meant literally
+		return figures[part] ? "@" + ngFigureLabel(part) : ngTypstText("@" + part);
 	}).join("");
 }
 
@@ -130,7 +153,8 @@ function ngTypstRenderer(ctx) {
 			case "text":
 			case "escape":
 				return withMath(t.tokens && t.tokens.length
-					? inlines(t.tokens) : ngTypstProse(ngUnescapeEntities(t.text)), t);
+					? inlines(t.tokens)
+					: ngTypstProse(ngUnescapeEntities(t.text), ctx.figures), t);
 			case "strong":
 				return "#strong[" + inlines(t.tokens) + "]";
 			case "em":
@@ -202,16 +226,25 @@ function ngTypstRenderer(ctx) {
 				return;
 			}
 			case "code": {
+				// A fence marked as a plot is a figure, not a listing: the
+				// picture is what the note shows and the code is folded away
+				// there, so printing the source here would put in the document
+				// the one thing the reader chose to hide.
+				const drawn = ctx.plots[t.text];
+				if (drawn && drawn.length) {
+					const meta = ngPlotMeta(t.text);
+					drawn.forEach(function (svg) {
+						const name = ctx.embedSVG(svg);
+						if (!name) return;
+						out.push("#figure(\n  image(" + ngTypstStr(name) + ", width: 85%)" +
+							(meta.caption ? ",\n  caption: [" + ngTypstProse(meta.caption) + "]" : "") +
+							"\n)" + (meta.label ? " <" + ngFigureLabel(meta.label) + ">" : "") + "\n");
+					});
+					return;
+				}
 				out.push("#raw(block: true, lang: " +
 					(t.lang ? ngTypstStr(String(t.lang).split(/\s+/)[0]) : "none") +
 					", " + ngTypstStr(t.text) + ")\n");
-				// A fence marked as a plot carries a picture in the note, and the
-				// PDF shows the same one — the same SVG, in fact, drawn once in
-				// the browser and handed to both. See ngCollectPlots.
-				(ctx.plots[t.text] || []).forEach(function (svg) {
-					const name = ctx.embedSVG(svg);
-					if (name) out.push("#align(center, image(" + ngTypstStr(name) + ", width: 85%))\n");
-				});
 				return;
 			}
 			case "hr":
@@ -328,6 +361,8 @@ function ngNoteToTypst(note, opts) {
 	const ctx = {
 		math: [],
 		plots: (opts && opts.plots) || {},
+		// which labels this note defines, so a stray "@" in prose stays an "@"
+		figures: (opts && opts.figures) || {},
 		// Figures are not note images: they have no record and no address,
 		// they were drawn a moment ago from the note's own code. They still
 		// reach the compiler the same way, as a file beside the document.
@@ -426,9 +461,22 @@ async function ngCollectPlots(note, onStatus) {
 	return plots;
 }
 
+// ngPlotLabels is the set of labels the note's figures define. A reference to
+// anything else is left as written — an "@" in prose is usually just an "@".
+function ngPlotLabels(note, plots) {
+	const labels = {};
+	Object.keys(plots || {}).forEach(function (code) {
+		const meta = ngPlotMeta(code);
+		if (meta.label) labels[meta.label] = true;
+	});
+	return labels;
+}
+
 async function ngNotePDF(note, opts) {
 	const plots = await ngCollectPlots(note, opts && opts.onStatus);
-	const withPlots = ngNoteToTypst(note, Object.assign({}, opts, { plots: plots }));
+	const figures = ngPlotLabels(note, plots);
+	const withPlots = ngNoteToTypst(note,
+		Object.assign({}, opts, { plots: plots, figures: figures }));
 	try {
 		return await ngTypstSend(withPlots.source, withPlots.files);
 	} catch (err) {
@@ -442,7 +490,8 @@ async function ngNotePDF(note, opts) {
 			// it through, so a malformed one fails the export outright — the
 			// note is worth more than the picture.
 			if (!Object.keys(plots).length) throw err2;
-			const plain = ngNoteToTypst(note, Object.assign({}, opts, { plots: {} }));
+			const plain = ngNoteToTypst(note,
+				Object.assign({}, opts, { plots: {}, figures: {} }));
 			return await ngTypstSend(ngTypstWithoutMath(plain.source), plain.files);
 		}
 	}

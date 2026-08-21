@@ -1283,22 +1283,6 @@ body.is-locked { overflow: hidden; }
 	font-size: 0.86rem;
 }
 
-/* a plot returned by a snippet */
-.run-figure {
-	display: block;
-	max-width: 100%;
-	margin: 0.7rem auto 0;
-	background: #fff;
-	border-radius: 6px;
-	padding: 0.4rem;
-}
-
-/* the figure a ```python plot fence draws for itself */
-.plot-figure {
-	display: block;
-	padding: 0.4rem 0.6rem 0.6rem;
-}
-
 /* the plotting instructions on the home page */
 .plot-help {
 	margin: 1.4rem 0 0;
@@ -1328,3 +1312,97 @@ body.is-locked { overflow: hidden; }
 .plot-help-actions {
 	margin: 0 0 0.6rem;
 }
+
+/* ---- plots ----
+ *
+ * A figure, not a code listing with a picture attached: no frame, no header,
+ * no language label. The source is one click away and looks like every other
+ * code block once it is open. */
+
+.plot {
+	margin: 1.4rem 0;
+	text-align: center;
+}
+
+.plot-stage {
+	display: block;
+}
+
+/* The white plate is deliberate rather than a theme slip: matplotlib draws in
+   dark ink on nothing, so against a dark page the axes would be invisible. */
+.run-figure {
+	display: inline-block;
+	max-width: 100%;
+	height: auto;
+	background: #fff;
+	border-radius: 8px;
+	padding: 0.5rem;
+}
+
+.plot-caption {
+	display: flex;
+	align-items: baseline;
+	justify-content: center;
+	gap: 0.4rem;
+	margin: 0.5rem auto 0;
+	max-width: 42rem;
+	color: var(--text-dim);
+	font-size: 0.86rem;
+	line-height: 1.45;
+	text-align: left;
+}
+
+.plot-number {
+	flex-shrink: 0;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.plot-number:not(:empty) + .plot-text:not(:empty)::before {
+	content: "\2014\a0";
+}
+
+.plot-text {
+	flex: 0 1 auto;
+}
+
+/* Small on purpose: a way back to the source, not an invitation. */
+.plot-toggle {
+	flex-shrink: 0;
+	align-self: center;
+	padding: 0 0.3rem;
+	border: 1px solid transparent;
+	border-radius: 5px;
+	background: none;
+	color: var(--text-dim);
+	font-family: var(--mono);
+	font-size: 0.72rem;
+	line-height: 1.5;
+	opacity: 0.55;
+	cursor: pointer;
+}
+
+.plot-toggle:hover,
+.plot-toggle.is-open {
+	opacity: 1;
+	color: var(--accent);
+	border-color: var(--border);
+	background: var(--bg-soft);
+}
+
+.plot-source {
+	margin-top: 0.7rem;
+	text-align: left;
+}
+
+.plot-failed .plot-stage {
+	display: block;
+	margin-bottom: 0.4rem;
+}
+
+.plot-ref {
+	color: var(--accent);
+	text-decoration: none;
+}
+
+.plot-ref:hover { text-decoration: underline; }

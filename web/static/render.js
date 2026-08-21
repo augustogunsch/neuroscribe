@@ -197,6 +197,9 @@ function ngRenderMarkdown(target, source) {
 	ngRestoreMath(target, protectedSrc.stash);
 	ngDressCodeBlocks(target);
 	enhance(target); // KaTeX + Run buttons, shared with the rest of the app
+	// Figures that were already drawn this session appear during enhance, so
+	// number them now; the ones still drawing renumber themselves as they land.
+	if (typeof ngNumberPlots === "function") ngNumberPlots(target);
 }
 
 /* ---- enhance rendered markdown: KaTeX math + run buttons ---- */
