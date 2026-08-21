@@ -2,7 +2,7 @@ BINARY  := neuroscribe
 GO      ?= go
 PYTHON  ?= python3
 
-.PHONY: all build release deploy check-runtime run run-open mail-dev pyodide typst vendor assets test vet fmt check hooks clean \
+.PHONY: all build release deploy check-runtime run run-open mail-dev pyodide typst vendor assets test test-js vet fmt check hooks clean \
 	app-bundle app-debug app-release app-publish app-version
 
 all: build
@@ -28,8 +28,36 @@ release:
 run: build
 	@if [ -f .env.local ]; then set -a; . ./.env.local; set +a; fi; ./$(BINARY)
 
-test:
+test: test-js
 	$(GO) test ./...
+
+# ---- the browser's half ----
+#
+# crypto.js decides what the server may see, and e2e.js is the only place a
+# password is handled. Both are held to full coverage: the run fails if a line,
+# a branch or a function in either goes unexercised, so the number cannot rot
+# quietly the way a reported percentage does.
+#
+# No node_modules and nothing to install: these are plain node:test files, and
+# web/jstest/harness.js runs the real browser scripts in a vm context with
+# stubbed globals. They sit outside web/static because everything under it is
+# embedded by web/embed.go and served to browsers — a test file there would
+# ship in the binary and in the APK.
+NODE ?= node
+JS_UNDER_TEST := web/static/crypto.js web/static/e2e.js
+# Listed rather than passed as a directory: node stopped expanding a directory
+# argument into the test files under it.
+JS_TESTS := $(wildcard web/jstest/*_test.js)
+
+test-js:
+	@command -v $(NODE) >/dev/null 2>&1 || { \
+		echo "$(NODE) not found: the browser tests need Node 22 or newer"; exit 1; }
+	@$(NODE) --test --experimental-test-coverage \
+		$(addprefix --test-coverage-include=,$(JS_UNDER_TEST)) \
+		--test-coverage-lines=100 \
+		--test-coverage-branches=100 \
+		--test-coverage-functions=100 \
+		$(JS_TESTS)
 
 vet:
 	$(GO) vet ./...
@@ -43,6 +71,7 @@ check: vendor
 		echo "gofmt required for:"; echo "$$unformatted"; exit 1; fi
 	$(GO) vet ./...
 	$(GO) test ./...
+	@$(MAKE) --no-print-directory test-js
 
 # install the git pre-commit hook
 hooks:
