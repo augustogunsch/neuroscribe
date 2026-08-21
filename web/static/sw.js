@@ -135,35 +135,76 @@ self.addEventListener("fetch", function (event) {
 	}
 });
 
-// The shell is served from cache first: it is the same document every time,
-// and going to the network for it would make every navigation wait on a
-// round trip for a page that has no content in it.
+// How long a navigation waits for the server before the cached shell answers
+// instead. Long enough that a working connection is used, short enough that a
+// phone with one bar opens the app rather than spinning.
+const NG_SHELL_TIMEOUT_MS = 1500;
+
+/* The shell: from the network when there is one, from the cache when there is
+ * not.
+ *
+ * It used to come from the cache first, which is faster and was wrong. "/" is
+ * two different documents — the app shell when you are signed in, the landing
+ * page when you are not — and only the server knows which. Answering from the
+ * cache meant a signed-out visitor got the shell, the shell found no key, and
+ * sent them to /login. The landing page became unreachable on any device that
+ * had ever cached the shell, and the only way out was clearing site data.
+ *
+ * So the network decides, and the cache is the fallback rather than the
+ * default. The cost is one round trip for a four-kilobyte document, and only
+ * on a real navigation — moving between notes inside the app never comes
+ * through here. The offline promise is unchanged: no network, or a network too
+ * slow to be worth waiting for, and the cached shell answers.
+ */
 async function ngShellResponse(request) {
 	const cache = await caches.open(NG_SHELL_CACHE);
 	let cached = await cache.match("/");
-	// Only the real app shell is ever cached — the server marks it. "/" also
-	// answers with the landing page when signed out, and caching that would
-	// poison every navigation with a document the app cannot boot from.
+	// Only the real app shell is ever cached — the server marks it. Caching
+	// the landing page here would poison every navigation with a document the
+	// app cannot boot from.
 	if (cached && !cached.headers.get("X-NG-Shell")) {
 		await cache.delete("/");
 		cached = undefined;
 	}
-	const network = fetch("/", { credentials: "same-origin" }).then(function (resp) {
+
+	// The address itself is fetched, not "/", because the server answers them
+	// differently: signed in, every app address returns the same shell; signed
+	// out, they redirect to the sign-in page. redirect "manual" hands that
+	// redirect back to the browser to perform — following it here would render
+	// the sign-in page under the address the reader asked for, leaving the
+	// location bar lying about which page they are looking at.
+	const network = fetch(request.url, {
+		credentials: "same-origin",
+		redirect: "manual",
+	}).then(function (resp) {
 		if (resp.ok && resp.type === "basic" && resp.headers.get("X-NG-Shell")) {
 			cache.put("/", resp.clone());
 		}
 		return resp;
 	});
-	if (cached) {
-		network.catch(function () {});
-		return cached;
+
+	if (!cached) {
+		try {
+			return await network;
+		} catch (err) {
+			return new Response("<h1>Offline</h1><p>This device has no cached copy of the app yet.</p>",
+				{ status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } });
+		}
 	}
+
+	// There is a cached shell, so a slow network must not hold the app hostage:
+	// whichever answers first wins, and the timer counts as an answer.
+	const timeout = new Promise(function (resolve) {
+		setTimeout(function () { resolve(null); }, NG_SHELL_TIMEOUT_MS);
+	});
 	try {
-		return await network;
+		const resp = await Promise.race([network, timeout]);
+		if (resp) return resp;
 	} catch (err) {
-		return new Response("<h1>Offline</h1><p>This device has no cached copy of the app yet.</p>",
-			{ status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } });
+		// offline, or the server refused: the cached shell is the answer
 	}
+	network.catch(function () {});
+	return cached;
 }
 
 async function ngAssetResponse(request) {

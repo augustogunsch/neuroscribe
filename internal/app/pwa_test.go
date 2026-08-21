@@ -121,6 +121,45 @@ func TestManifestDescribesAnInstallableApp(t *testing.T) {
 // The service worker's own rules, checked as text because there is no way to
 // run one from here. These are the two that would be catastrophic to get
 // wrong: caching the sync conversation, or failing to precache the shell.
+// "/" is two documents — the app shell signed in, the landing page signed out
+// — and only the server knows which. Answering it from the cache handed a
+// signed-out visitor the shell, which found no key and sent them to /login: the
+// landing page became unreachable on any device that had once cached the shell,
+// with no way out but clearing site data. The network has to decide.
+func TestTheShellIsNotServedFromCacheWhileOnline(t *testing.T) {
+	sw := readAsset(t, "static/sw.js")
+
+	// Scoped to the shell handler: assets are versioned by the build hash, so
+	// cache-first is right for those and wrong only here.
+	start := strings.Index(sw, "async function ngShellResponse")
+	if start < 0 {
+		t.Fatal("ngShellResponse not found")
+	}
+	end := strings.Index(sw[start:], "\nasync function ")
+	if end < 0 {
+		t.Fatal("could not find the end of ngShellResponse")
+	}
+	shell := sw[start : start+end]
+
+	if strings.Contains(shell, "if (cached) {\n\t\tnetwork.catch") {
+		t.Error("the worker answers navigations from cache without asking the server; " +
+			"a signed-out visitor gets the app shell and is bounced to /login")
+	}
+	// The cache must remain the answer when the network cannot be reached, or
+	// this trades a signed-out bug for a broken offline promise.
+	if !strings.Contains(shell, "NG_SHELL_TIMEOUT_MS") {
+		t.Error("there is no bound on how long a navigation waits for the server")
+	}
+	if !strings.Contains(shell, "return cached;") {
+		t.Error("the cached shell is no longer the fallback; the app would not open offline")
+	}
+	// Following the redirect here would render the sign-in page under the
+	// address that was asked for, leaving the location bar wrong.
+	if !strings.Contains(shell, `redirect: "manual"`) {
+		t.Error("a signed-out deep link would render /login under the original address")
+	}
+}
+
 func TestServiceWorkerRules(t *testing.T) {
 	sw := readAsset(t, "static/sw.js")
 	if !strings.Contains(sw, `url.pathname === "/sync"`) || !strings.Contains(sw, `url.pathname.startsWith("/sync/")`) {
