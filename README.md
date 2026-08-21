@@ -176,12 +176,15 @@ gracefully without them, and every file is checked against `assets.sha256`.
   neither can reach the note: execution happens inside a worker, inside a
   frame sandboxed to an opaque origin, with a 60 s (Python) / 10 s
   (JavaScript) limit that terminates a runaway loop.
-- **Plots** — add `plot` to a Python fence and the block draws itself when the
-  note opens, with matplotlib: cartesian charts, function graphs, vector
-  fields, contours, and 3D surfaces. The figure is SVG, so it stays vector in
-  the note and in the PDF — the same bytes go into both, which is why they
-  match. Drawn in the same sandbox as any other snippet; nothing is sent
-  anywhere. See *Drawing* below.
+- **Figures** — two ways to draw, and you use whichever runtime you already
+  have. A ```` ```plot ```` fence is [CeTZ](https://github.com/cetz-package/cetz)
+  and is drawn by the same typesetter that makes your PDFs: milliseconds,
+  vector, and identical in the note and the document because it is one
+  rendering rather than two that agree. A ```` ```python plot ```` fence is
+  matplotlib, which brings numpy, scipy, sympy and 3D. Either way the code is
+  folded away behind a small control, the figure is numbered and captioned, and
+  `@label` in the prose points at it. Nothing is sent anywhere. See *Drawing*
+  below.
 - **PDF export** — the whole note (all chapters as numbered headings, with a
   title page, metadata block and table of contents), converted Markdown→Typst
   and compiled in the browser; attached images are embedded and code keeps its
@@ -289,61 +292,90 @@ scripts/           fetch.sh, which installs nothing unpinned
 
 ## Drawing
 
-Put `plot` after the language on a Python fence:
+A figure is a fenced block that draws itself when the note opens. The picture
+is what you see; the code folds away behind a small `</>` in the caption.
+
+There are two engines and the choice is mostly about which runtime you already
+have on the device.
+
+### `plot` — the typesetter
+
+CeTZ, compiled by the same Typst that builds your PDFs. Milliseconds to draw,
+vector everywhere, and the figure in the note and the figure in the document
+are the same rendering rather than two that happen to agree.
 
 ````markdown
-```python plot
-import numpy as np, matplotlib.pyplot as plt
-
-x = np.linspace(-2*np.pi, 2*np.pi, 400)
-plt.plot(x, np.sin(x), label="sin x")
-plt.plot(x, np.cos(x), "--", label="cos x")
-plt.axhline(0, color="0.6", lw=0.8)
-plt.legend(); plt.grid(True)
-plt.title("Trigonometric functions")
+```plot
+//: label=wave
+//: A sine wave over two periods.
+canvas({
+  plot.plot(size: (8, 5), x-tick-step: 2, y-tick-step: 0.5, {
+    plot.add(domain: (-2*calc.pi, 2*calc.pi), x => calc.sin(x))
+  })
+})
 ```
 ````
 
-The block draws itself when the note opens and the figure appears under the
-code. A `python` fence without the marker keeps its *Run* button and stays
-inert until you press it — the marker is how you say "this one is a picture".
+`canvas`, `draw`, `plot` and `chart` are in scope. CeTZ draws lines, arrows,
+shapes, geometry and trees; cetz-plot puts axes, charts and legends around
+them. It cannot do 3D surfaces and has no numerical library — for those, use
+the Python fence.
 
-Anything matplotlib can draw works, and numpy, scipy and sympy are already
-alongside it. A vector field:
+### `python plot` — matplotlib
 
+Everything numpy, scipy and sympy can compute, plus 3D.
+
+````markdown
 ```python plot
-import numpy as np, matplotlib.pyplot as plt
-Y, X = np.mgrid[-3:3:20j, -3:3:20j]
-plt.quiver(X, Y, -Y, X)
-plt.gca().set_aspect("equal")
-```
-
-A surface in 3D:
-
-```python plot
+#: label=surface
+#: A saddle.
 import numpy as np, matplotlib.pyplot as plt
 fig = plt.figure()
 ax = fig.add_subplot(projection="3d")
-X, Y = np.meshgrid(np.linspace(-3, 3, 60), np.linspace(-3, 3, 60))
-ax.plot_surface(X, Y, np.sin(X**2 + Y**2), cmap="viridis")
+X, Y = np.meshgrid(np.linspace(-3, 3, 40), np.linspace(-3, 3, 40))
+ax.plot_surface(X, Y, X**2 - Y**2, cmap="viridis")
 ```
+````
 
-Worth knowing:
+### Captions, numbers and references
 
-- **It needs the Python runtime.** `make pyodide` fetches it, matplotlib
-  included (~12 MB of the 139 MB). Without it a plot block says so and the
-  PDF keeps the code and omits the picture.
-- **The first plot in a session is slow** — a few seconds while Python starts
-  and matplotlib loads. After that they are quick, and a figure already drawn
-  is remembered until the app is locked or reloaded.
-- **The PDF gets the same SVG**, so it is vector and it matches what you saw.
-  Exporting a note you have not opened draws its plots first, which takes as
-  long as opening it would have.
-- **The code appears in the PDF too**, under the same rules as any other
-  fence. Move it to its own chapter, or out of the note, if you want the
-  figure alone.
-- **A 3D surface is a large picture.** The 60×60 mesh above is about 250 KB of
-  SVG; halve the resolution if a note carries many of them.
+A fence may open with directives, written as a comment in whichever language it
+is — `//:` in Typst, `#:` in Python — so the source still runs and still pastes
+into a file:
+
+- `label=name` gives the figure a name.
+- anything else is the caption.
+
+Figures number themselves in the order they appear, and `@name` in the prose
+becomes a link to *Figure 2*. An `@` that names no figure is left alone, so an
+email address stays an email address. The web numbers within a chapter and the
+PDF numbers across the whole note, which is what equations already do here.
+
+### What each one costs
+
+Nothing is downloaded until you draw something, and then only what that engine
+needs.
+
+| | needs | size | also used by |
+|---|---|---|---|
+| `plot` | the typesetter | ~29 MB | PDF export |
+| `python plot` | the Python runtime | ~30 MB | runnable snippets |
+
+So a figure is nearly free if you already export PDFs (`plot`) or already run
+snippets (`python plot`), and neither is fetched on a device that does neither.
+`make typst` and `make pyodide` fetch them; `make assets` does both.
+
+### Worth knowing
+
+- **The first Python figure of a session takes about two seconds** while the
+  interpreter starts. After that they are milliseconds, and a device that has
+  drawn before starts Python quietly at boot so even the first one is instant.
+  CeTZ has no such warm-up.
+- **The code does not appear in the PDF.** You folded it away in the note; the
+  document agrees.
+- **A figure is shown as an image, never as inline markup** — see *Security*.
+- **A 3D surface is a large picture.** The 40×40 mesh above is well over
+  100 KB of SVG; halve the resolution if a note carries many of them.
 
 ## How offline works
 

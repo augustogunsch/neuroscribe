@@ -165,6 +165,7 @@ typst:
 	fi
 	@$(PYTHON) scripts/package-manifest.py \
 		typst/packages/cetz typst/packages/cetz-plot typst/packages/oxifmt
+	@$(PYTHON) scripts/package-manifest.py --stamp typst
 	@rm -rf typst/dl
 	@echo "typst ready: $$(du -sh typst | cut -f1)"
 

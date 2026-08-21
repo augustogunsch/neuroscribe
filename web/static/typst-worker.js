@@ -13,6 +13,38 @@
 
 const NG_TYPST = "/typst/";
 
+/* Every file under /typst/ is served with a year-long, immutable cache, which
+ * is right for bytes that never change at a given address — and these do. A
+ * package is rewritten in place when it is fetched, and a version bump in the
+ * Makefile replaces the compiler without changing its URL. A browser holding
+ * the old copy would use it for a year, and the symptom is not "a stale cache",
+ * it is "the new thing does not work", which is a much worse thing to debug.
+ *
+ * So the directory carries a version, manifest.json is the only file served
+ * uncached, and everything else is asked for with that version on the end.
+ * Change any byte and every address changes, once. */
+let runtimeVersion = null;
+
+// Read once, before anything is loaded. typstURL has to stay synchronous:
+// typst.ts asks for the wasm's address and passes whatever it gets straight to
+// WebAssembly.instantiate, so a promise gets that far before failing.
+async function readVersion() {
+	if (runtimeVersion !== null) return runtimeVersion;
+	try {
+		const resp = await fetch(NG_TYPST + "manifest.json", { cache: "no-cache" });
+		runtimeVersion = resp.ok ? (await resp.json()).version || "" : "";
+	} catch (err) {
+		// No manifest is not fatal: the runtime still loads, it just loses the
+		// guarantee that it is the current one.
+		runtimeVersion = "";
+	}
+	return runtimeVersion;
+}
+
+function typstURL(path) {
+	return NG_TYPST + path + (runtimeVersion ? "?v=" + encodeURIComponent(runtimeVersion) : "");
+}
+
 const NG_TYPST_FONTS = [
 	"NewCM10-Regular.otf", "NewCM10-Bold.otf", "NewCM10-Italic.otf",
 	"NewCM10-BoldItalic.otf", "NewCMMath-Regular.otf",
@@ -41,25 +73,27 @@ async function fetchBytes(url) {
 function boot() {
 	if (!bootPromise) {
 		bootPromise = (async () => {
-			const mod = await import(NG_TYPST + "typst.mjs");
+			await readVersion();
+			const mod = await import(typstURL("typst.mjs"));
 			// the output format is an enum, and an unrecognised value silently
 			// yields typst.ts's own vector format instead of a PDF
-			pdfFormat = (await import(NG_TYPST + "compiler.mjs")).CompileFormatEnum.pdf;
+			pdfFormat = (await import(typstURL("compiler.mjs"))).CompileFormatEnum.pdf;
 			const fonts = await Promise.all(
-				NG_TYPST_FONTS.map((f) => fetchBytes(NG_TYPST + "fonts/" + f)));
+				NG_TYPST_FONTS.map((f) => fetchBytes(typstURL("fonts/" + f))));
 			const compiler = mod.createTypstCompiler();
 			await compiler.init({
 				// typst.ts imports its wasm wrapper by package name, which a
 				// browser cannot resolve without an import map. Both hooks
 				// below exist to point it at real URLs instead.
-				getWrapper: () => import(NG_TYPST + "typst_ts_web_compiler.mjs"),
-				getModule: () => NG_TYPST + "typst_ts_web_compiler_bg.wasm",
+				getWrapper: () => import(typstURL("typst_ts_web_compiler.mjs")),
+				getModule: () => typstURL("typst_ts_web_compiler_bg.wasm"),
 				// assets: false stops typst.ts reaching for its default fonts
 				// over the network; ours are the only ones it gets.
 				beforeBuild: [mod.loadFonts(fonts, { assets: false })],
 			});
 			for (const f of NG_MITEX_FILES) {
-				compiler.mapShadow("/mitex/" + f, await fetchBytes(NG_TYPST + "packages/mitex/" + f));
+				compiler.mapShadow("/mitex/" + f,
+					await fetchBytes(typstURL("packages/mitex/" + f)));
 			}
 			await mapPackage(compiler, "cetz");
 			await mapPackage(compiler, "cetz-plot");
@@ -78,10 +112,10 @@ function boot() {
  * other by relative path. The manifest lists them so nothing has to be
  * discovered at runtime. */
 async function mapPackage(compiler, name) {
-	const manifest = await (await fetch(NG_TYPST + "packages/" + name + "/files.json")).json();
+	const manifest = await (await fetch(typstURL("packages/" + name + "/files.json"))).json();
 	for (const f of manifest) {
 		compiler.mapShadow("/" + name + "/" + f,
-			await fetchBytes(NG_TYPST + "packages/" + name + "/" + f));
+			await fetchBytes(typstURL("packages/" + name + "/" + f)));
 	}
 }
 
@@ -100,11 +134,12 @@ let rendererPromise = null;
 function renderer() {
 	if (!rendererPromise) {
 		rendererPromise = (async () => {
-			const mod = await import(NG_TYPST + "typst.mjs");
+			await readVersion();
+			const mod = await import(typstURL("typst.mjs"));
 			const r = mod.createTypstRenderer();
 			await r.init({
-				getWrapper: () => import(NG_TYPST + "typst_ts_renderer.mjs"),
-				getModule: () => NG_TYPST + "typst_ts_renderer_bg.wasm",
+				getWrapper: () => import(typstURL("typst_ts_renderer.mjs")),
+				getModule: () => typstURL("typst_ts_renderer_bg.wasm"),
 			});
 			return r;
 		})().catch((err) => {

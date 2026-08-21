@@ -17,6 +17,7 @@ Makefile.
 
     usage: package-manifest.py <package-dir> [<package-dir> ...]
 """
+import hashlib
 import json
 import os
 import re
@@ -96,7 +97,41 @@ def main(dirs):
         print(f"{pkg}: {len(files)} files{note}")
 
 
+def stamp(root):
+    """Write a version covering everything served from this directory.
+
+    The files here are served with a year-long, immutable cache, which is right
+    for bytes that never change at a given address and wrong for these: a
+    package rewritten in place, or a version bumped in the Makefile, keeps the
+    same URL. A browser that has the old copy would go on using it for a year,
+    and nothing about that failure looks like a caching problem — it looks like
+    the new code not working.
+
+    So the directory gets a version, this file alone is served without caching,
+    and everything else is fetched with the version on the end of its address.
+    A change to any byte changes every address, once.
+    """
+    digest = hashlib.sha256()
+    for dirpath, dirs, names in os.walk(root):
+        dirs.sort()
+        for n in sorted(names):
+            if n == "manifest.json":
+                continue
+            full = os.path.join(dirpath, n)
+            digest.update(os.path.relpath(full, root).encode())
+            with open(full, "rb") as f:
+                for chunk in iter(lambda: f.read(1 << 20), b""):
+                    digest.update(chunk)
+    version = digest.hexdigest()[:12]
+    with open(os.path.join(root, "manifest.json"), "w", encoding="utf-8") as f:
+        json.dump({"version": version}, f)
+    print(f"{root}: version {version}")
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         raise SystemExit(__doc__)
-    main(sys.argv[1:])
+    if sys.argv[1] == "--stamp":
+        stamp(sys.argv[2])
+    else:
+        main(sys.argv[1:])

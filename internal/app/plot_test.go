@@ -168,6 +168,39 @@ func TestTheDrawingCarriesNoCode(t *testing.T) {
 	}
 }
 
+// A runtime is served with a year-long, immutable cache, which is right for
+// bytes that never change at an address and wrong for these — a package is
+// rewritten in place when it is fetched, and a version bump replaces the
+// compiler without changing its URL. The directory carries a version, one file
+// says what it is, and everything else is asked for with it on the end.
+//
+// What makes this worth a test is the shape of the failure: a browser holding
+// last month's runtime does not look like a caching problem, it looks like the
+// new code not working, and it lasts a year.
+func TestARuntimeChangeReachesBrowsersThatHaveIt(t *testing.T) {
+	server := repoFile(t, "internal/app/runner.go")
+	if !strings.Contains(string(server), `path.Base(r.URL.Path) == "manifest.json"`) {
+		t.Error("the manifest is cached like everything else, so a new runtime would be invisible")
+	}
+	if !strings.Contains(string(server), "immutable") {
+		t.Error("runtime files are no longer cached at all; every load would refetch megabytes")
+	}
+
+	worker := readAsset(t, "static/typst-worker.js")
+	if !strings.Contains(worker, "manifest.json") || !strings.Contains(worker, `"?v="`) {
+		t.Error("the worker no longer versions the addresses it fetches")
+	}
+	// typst.ts hands whatever getModule returns straight to
+	// WebAssembly.instantiate, so the version has to be known before any URL is
+	// built rather than awaited inside the builder.
+	if !strings.Contains(worker, "await readVersion();") {
+		t.Error("the version is not resolved before the runtime loads")
+	}
+	if strings.Contains(worker, "getModule: async") {
+		t.Error("getModule returns a promise; WebAssembly.instantiate will refuse it")
+	}
+}
+
 // The same SVG goes into the note and into the PDF. That is the whole reason
 // the two agree, so the PDF must take the figure as a file and not re-draw it.
 func TestThePDFEmbedsTheSameFigure(t *testing.T) {

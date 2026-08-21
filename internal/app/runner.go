@@ -15,6 +15,7 @@ package app
 import (
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -66,7 +67,20 @@ func runtimeAssets(dir string) http.Handler {
 	files := http.FileServer(http.Dir(dir))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
-		h.Set("Cache-Control", "public, max-age=31536000, immutable")
+		// The one file that is never cached, because it is what says whether
+		// everything else still may be. A runtime is fetched with its version
+		// on the end of the address, so changing any byte changes every
+		// address — but only if this answer is fresh. Cache it, and a browser
+		// keeps last month's runtime for a year; nothing about that failure
+		// looks like a caching problem from the outside, which is exactly what
+		// makes it expensive.
+		// the route strips the /typst/ prefix, so this arrives as a bare
+		// name rather than a path
+		if path.Base(r.URL.Path) == "manifest.json" {
+			h.Set("Cache-Control", "no-cache")
+		} else {
+			h.Set("Cache-Control", "public, max-age=31536000, immutable")
+		}
 		switch {
 		case strings.HasSuffix(r.URL.Path, ".wasm"):
 			h.Set("Content-Type", "application/wasm")
