@@ -314,3 +314,59 @@ func TestTheReasonIsWhatIsShown(t *testing.T) {
 		t.Error("wasm frames are no longer recognised as frames")
 	}
 }
+
+// A dollar sign inside code is a dollar sign.
+//
+// Math is lifted out of a note before Markdown is parsed, so that underscores
+// and backslashes in a formula survive. Run over the whole source it also
+// lifted formulas out of code — and a drawing is code that is read back off
+// the page as text, so `$alpha$` in a CeTZ fence came back as KaTeX's markup
+// flattened into one word, and the typesetter was asked for a variable called
+// alphaalphaalpha. The PDF got the placeholder itself.
+//
+// Nothing about that is visible from either end: the fence is correct and the
+// compiler is fine. It is the pass in between that has to know where code is.
+func TestADollarInCodeIsADollar(t *testing.T) {
+	render := readAsset(t, "static/render.js")
+
+	if !strings.Contains(render, "function ngOutsideCode") {
+		t.Fatal("the math pass no longer knows where code is")
+	}
+	if !strings.Contains(render, "ngOutsideCode(String(src), prose)") {
+		t.Error("ngProtectMath runs over the whole source again, code included")
+	}
+	// Fences and inline spans both, since `$HOME` in prose is a variable too.
+	// Checked by its use, not its name: a constant that is merely defined
+	// protects nothing.
+	if !strings.Contains(render, "text.split(NG_CODE_SPAN)") {
+		t.Error("inline code spans are no longer protected")
+	}
+}
+
+// The note and the PDF must wrap a figure the same way, because they are the
+// same figure — that is the whole claim CeTZ fences make here.
+//
+// They are reached differently: the note builds a document around the fence
+// and draws it, the PDF drops it into #figure() among the prose. While each
+// decided for itself how to wrap the body, they disagreed, and the PDF refused
+// every drawing that opened with an import — which is every published example.
+func TestTheNoteAndThePDFWrapAFigureTheSameWay(t *testing.T) {
+	typst := readAsset(t, "static/typst.js")
+
+	if !strings.Contains(typst, "function ngCetzBlock") {
+		t.Fatal("the shared wrapping rule is gone")
+	}
+	// Defined once, used by both paths.
+	if n := strings.Count(typst, "ngCetzBlock("); n < 3 {
+		t.Errorf("ngCetzBlock has %d mentions; one of the two paths no longer uses it", n)
+	}
+	if strings.Contains(typst, `"#figure(\n  {" + t.text`) {
+		t.Error("the PDF wraps the fence itself again, in code mode, " +
+			"where a leading # is a syntax error")
+	}
+	// A body starting with "#" is markup and must go in a content block; the
+	// distinction is the entire point of the function.
+	if !strings.Contains(typst, `body.charAt(0) === "#" ? "[" : "{"`) {
+		t.Error("the markup-versus-code decision is gone; one of the two forms will fail")
+	}
+}

@@ -1,0 +1,155 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>pipeline harness</title>
+<!--
+  The note pipeline, end to end, in a real browser.
+
+  It exists because the unit-ish assertions in internal/app read the source of
+  these files and cannot run them, and because a harness that feeds the
+  compiler directly proves only that the compiler works. Both of the bugs this
+  was written for lived in between: a fence whose $math$ was rendered before
+  the drawing code read it back, and a figure the note and the PDF wrapped
+  differently. Each of those looked fine from either end.
+
+  To run it:
+
+      ln -sfn "$PWD/web/static" static
+      ln -sfn "$PWD/typst" typst          # needs `make typst` first
+      python3 -m http.server 8791
+      open http://127.0.0.1:8791/scripts/pipeline-harness.html
+
+  Every script is loaded with a fresh query string. Without that the browser
+  serves the previous copy and the harness reports on code that is no longer on
+  disk — which happened, and nearly hid a mutation that should have failed.
+-->
+
+<link rel="stylesheet" href="/static/vendor/katex.min.css">
+<pre id="out">loading…</pre>
+<div id="note" style="display:none"></div>
+
+<script>
+// Every script is loaded with a fresh query string. Without this the browser
+// serves the previous copy and the harness cheerfully reports on code that is
+// no longer on disk — which it did, once, and nearly hid a mutation.
+const NGV = location.search.slice(1) || String(performance.timeOrigin);
+document.write([
+  "/static/vendor/katex.min.js", "/static/vendor/marked.min.js",
+  "/static/vendor/purify.min.js", "/static/strings.js",
+].map(u => '<scr' + 'ipt src="' + u + '?' + NGV + '"></scr' + 'ipt>').join(""));
+</script>
+<script>
+// router.js drags in the whole app; ngTF is the only thing needed from it.
+function ngTF(format) {
+	const args = Array.prototype.slice.call(arguments, 1);
+	let i = 0;
+	return ngT(format).replace(/%s|%d/g, function () { return args[i++]; });
+}
+</script>
+<script>
+document.write(["/static/run.js", "/static/render.js", "/static/typst.js"]
+  .map(u => '<scr' + 'ipt src="' + u + '?' + NGV + '"></scr' + 'ipt>').join(""));
+</script>
+
+<script>
+// The whole point of this harness: go in through the front door. A note is
+// markdown, and everything that mangles a fence does it between here and the
+// compiler.
+const NOTE = `Some prose with real math in it, $E = mc^2$, which must survive.
+
+A reference to @angles follows the figure.
+
+\`\`\`plot
+//: label=angles
+//: Two angles and their difference.
+#import "@preview/cetz:0.3.4"
+#import cetz.draw: *
+#import cetz.angle: angle
+
+#cetz.canvas(length: 7cm, {
+  let a = 30deg
+  let b = 70deg
+  let (r-alpha, r-beta, r-diff) = (0.2, 0.4, 0.7)
+  let pad = 1.15
+
+  set-style(
+    mark: (fill: black),
+    angle: (label-radius: pad * 100%, mark: (end: ">")),
+  )
+
+  let O = (0, 0)
+  let X = (1, 0)
+  let A = (a, 1)
+  let B = (b, 1)
+
+  line((-0.2, 0), (1, 0), stroke: 0.5pt)
+  line((0, -0.2), (0, 1), stroke: 0.5pt)
+
+  for p in (A, B) {
+    line(O, p, mark: (end: ">"))
+  }
+
+  angle(O, X, A, label: $alpha$, radius: r-alpha, label-radius: 125%)
+  angle(O, A, B, label: $beta - alpha$, radius: r-diff)
+
+  angle(O, X, B, radius: r-beta)
+  content(((a + b) / 2, r-beta * pad), $beta$)
+})
+\`\`\`
+
+And a plain fence, whose dollars are dollars: \`$HOME\` and
+
+\`\`\`sh
+echo "$PATH costs \\$5"
+\`\`\`
+`;
+
+const out = document.getElementById("out");
+const log = (s) => { out.textContent += s + "\n"; };
+const ok = (cond, what) => log((cond ? "ok   " : "FAIL ") + what);
+
+(async () => {
+  out.textContent = "";
+
+  // ---- 1. the source survives markdown ----
+  const prot = ngProtectMath(NOTE);
+  const fenceKept = prot.text.includes("$alpha$") && prot.text.includes("$beta - alpha$");
+  ok(fenceKept, "fence math is left alone by the math pass");
+  ok(!prot.text.includes("$E = mc^2$"), "prose math is still extracted");
+  ok(prot.text.includes("$PATH"), "a dollar in a shell fence is left alone");
+  ok(prot.text.includes("`$HOME`"), "a dollar in an inline code span is left alone");
+
+  // ---- 2. what the DOM gives back to the drawing code ----
+  const note = document.getElementById("note");
+  note.style.display = "";
+  ngRenderMarkdown(note, NOTE);
+
+  const block = note.querySelector(".ng-plot, code.language-plot, pre code");
+  const pre = note.querySelector(".codeblock pre") || note.querySelector("pre");
+  const readBack = pre ? pre.textContent : "";
+  ok(readBack.includes("$alpha$"), "the code read back off the page still says $alpha$");
+  ok(!readBack.includes("alphaalpha"), "no flattened KaTeX in the code");
+  ok(note.querySelector(".math, .katex") !== null, "prose math still typeset");
+
+  // ---- 3. does it actually draw? ----
+  let drew = null;
+  for (let i = 0; i < 60; i++) {
+    const img = note.querySelector("figure img, img.run-figure");
+    const bad = note.querySelector(".run-bad");
+    if (img) { drew = "drew"; break; }
+    if (bad && bad.textContent.trim()) { drew = "error: " + bad.textContent.trim(); break; }
+    await new Promise(r => setTimeout(r, 500));
+  }
+  ok(drew === "drew", "the figure draws in the note — " + (drew || "nothing happened"));
+
+  // ---- 4. the PDF, through the same front door ----
+  try {
+    const note1 = { title: "Harness", chapters: [{ title: "One", content: NOTE }] };
+    const pdf = await ngNotePDF(note1, {});
+    ok(pdf && pdf.length > 1000, "the PDF builds (" + (pdf ? pdf.length : 0) + " bytes)");
+  } catch (err) {
+    ok(false, "the PDF builds — " + (err && err.message || err));
+  }
+
+  log("DONE");
+})().catch(e => log("HARNESS BROKE: " + (e && e.stack || e)));
+</script>

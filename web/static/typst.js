@@ -79,25 +79,37 @@ const NG_CETZ_PREAMBLE = `#import "/cetz/src/lib.typ" as cetz: draw, canvas
 // carry are comments in Typst too, so the source stays something you could
 // paste into a .typ file.
 async function ngCetzFigure(code) {
-	return ngTypstSend(NG_CETZ_PREAMBLE + ngCetzBody(code), {}, "svg");
+	return ngTypstSend(NG_CETZ_PREAMBLE + "#" + ngCetzBlock(code), {}, "svg");
 }
 
-/* A fence is written as an expression — canvas({ … }) — not as Typst markup,
- * because that is what a drawing is. Markup mode would take it for prose and
- * typeset the source instead of running it, which fails silently: you get a
- * figure, it is just a picture of your own code. So the body is put into code
- * mode explicitly, and the directives are left where they are, being comments.
+/* One fence, as one Typst expression — used by the note and by the PDF.
+ *
+ * They must agree, and they are reached by different routes: the note wraps
+ * the block in a document of its own and draws it, the PDF drops it into
+ * #figure() among the prose. When each decided for itself how to wrap a body,
+ * they diverged, and the PDF refused every drawing that opened with an import.
+ *
+ * The decision is which mode the body is written in. A drawing is normally a
+ * sequence of expressions — canvas({ … }) — and has to be put into code mode
+ * explicitly, or markup mode typesets the source instead of running it and you
+ * get a figure that is a picture of your own code. But every published CeTZ
+ * example opens with #import, and a "#" is what markup uses to enter code: in
+ * code mode it is a syntax error. So a body that starts with one is markup and
+ * goes in a content block; anything else goes in a code block.
+ *
+ * The directives above the body are comments in Typst, in either mode, so they
+ * stay where they were written.
  */
-function ngCetzBody(code) {
+function ngCetzBlock(code) {
 	const lines = String(code || "").split("\n");
 	let at = 0;
 	while (at < lines.length && (!lines[at].trim() || /^\s*(?:#|\/\/)\s*:/.test(lines[at]))) at++;
 	const head = lines.slice(0, at).join("\n");
 	const body = lines.slice(at).join("\n").trim();
-	if (!body) return head;
-	// already in code mode
-	if (body.charAt(0) === "#") return head + "\n" + body;
-	return head + "\n#{\n" + body + "\n}";
+	if (!body) return "[]";
+	const open = body.charAt(0) === "#" ? "[" : "{";
+	const close = open === "[" ? "]" : "}";
+	return open + "\n" + head + "\n" + body + "\n" + close;
 }
 
 /* ---- emitting Typst source ---- */
@@ -279,8 +291,9 @@ function ngTypstRenderer(ctx) {
 				// figure in the PDF is drawn by the compiler building the PDF.
 				if (String(t.lang || "").trim().split(/\s+/)[0] === "plot") {
 					const meta = ngPlotMeta(t.text);
-					// already inside a code block, so the body goes in as written
-					out.push("#figure(\n  {" + t.text + "\n  }" +
+					// wrapped by the same rule the note draws it under, so the
+					// two cannot disagree about what mode the body is in
+					out.push("#figure(\n  " + ngCetzBlock(t.text) +
 						(meta.caption ? ",\n  caption: [" + ngTypstProse(meta.caption, ctx.figures) + "]" : "") +
 						"\n)" + (meta.label ? " <" + ngFigureLabel(meta.label) + ">" : "") + "\n");
 					return;

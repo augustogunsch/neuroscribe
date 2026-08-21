@@ -9,6 +9,60 @@
 
 /* ---- markdown, rendered here because the server cannot read it ---- */
 
+/* A fence opens and closes a region where a dollar sign is just a dollar sign.
+ * Three or more backticks or tildes, indented no more than three spaces, and
+ * closed by at least as many of the same character with nothing after them —
+ * which is CommonMark's rule, and marked's, so the two agree on where code
+ * begins. An unclosed fence runs to the end, again as marked reads it. */
+const NG_FENCE = /^[ \t]{0,3}(`{3,}|~{3,})/;
+
+// Inline spans, for the same reason at a smaller scale: `$HOME` is a variable.
+const NG_CODE_SPAN = /(``[^`]*``|`[^`\n]*`)/;
+
+/* ngOutsideCode applies fn to the prose and leaves code exactly as written.
+ *
+ * This is what keeps `$alpha$` inside a drawing readable as Typst math. Left
+ * to itself the math pass took it for a formula anywhere it appeared, so a
+ * fence came back holding a rendered equation instead of the line someone
+ * wrote — and since a figure's code is read back out of the page as text, what
+ * reached the typesetter was KaTeX's markup flattened into a word.
+ *
+ * Indented code blocks are not handled: telling one from a wrapped list item
+ * needs the block structure, and by the time that is known the text has been
+ * parsed. Fence your code, which every editor does anyway.
+ */
+function ngOutsideCode(src, fn) {
+	const lines = String(src).split("\n");
+	const out = [];
+	let prose = [];
+	let fence = null;
+	const flush = () => {
+		if (prose.length) out.push(fn(prose.join("\n")));
+		prose = [];
+	};
+	for (const line of lines) {
+		const marker = line.match(NG_FENCE);
+		if (fence) {
+			out.push(line);
+			// closes only on the same character, at least as long, alone
+			if (marker && marker[1][0] === fence[0] && marker[1].length >= fence.length &&
+				!line.slice(line.indexOf(marker[1]) + marker[1].length).trim()) {
+				fence = null;
+			}
+			continue;
+		}
+		if (marker) {
+			flush();
+			out.push(line);
+			fence = marker[1];
+			continue;
+		}
+		prose.push(line);
+	}
+	flush();
+	return out.join("\n");
+}
+
 // Math is pulled out before Markdown parsing so underscores and backslashes
 // inside formulas survive, then put back as elements KaTeX can typeset.
 function ngProtectMath(src) {
@@ -17,9 +71,15 @@ function ngProtectMath(src) {
 		stash.push({ tex: tex, display: display });
 		return "NGXMATH" + (stash.length - 1) + "X";
 	};
-	let out = src.replace(/\$\$([\s\S]+?)\$\$/g, (_, tex) => keep(tex, true));
-	out = out.replace(/(^|[^\\$])\$([^\n$]+?)\$/g, (m, pre, tex) => pre + keep(tex, false));
-	return { text: out, stash: stash };
+	const formulas = (text) => {
+		let out = text.replace(/\$\$([\s\S]+?)\$\$/g, (_, tex) => keep(tex, true));
+		out = out.replace(/(^|[^\\$])\$([^\n$]+?)\$/g, (m, pre, tex) => pre + keep(tex, false));
+		return out;
+	};
+	const prose = (text) => text.split(NG_CODE_SPAN)
+		.map((part, i) => (i % 2 ? part : formulas(part)))
+		.join("");
+	return { text: ngOutsideCode(String(src), prose), stash: stash };
 }
 
 function ngRestoreMath(root, stash) {
