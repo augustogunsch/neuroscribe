@@ -103,6 +103,57 @@ function ngCurrentNoteRef() {
 
 /* ---- index ---- */
 
+/* The plotting instructions, on the one page that serves as this app's manual.
+ *
+ * Written to be copied: the marker is the whole feature, and a fence someone
+ * can lift straight into a note says it better than a paragraph would.
+ */
+
+function ngPlotHint() {
+	if (!document.body.dataset.runner) {
+		// Saying "add plot to a Python block" on a server that cannot run
+		// Python is an instruction that ends in a shrug.
+		return ngEl("li", { class: "run-meta",
+			text: ngT("Plotting needs the Python runtime, which this server does not have: run `make pyodide` to add it.") });
+	}
+	return ngEl("li", { text: ngT("Add plot to a Python block and it draws itself with matplotlib — charts, function graphs, vector fields and 3D surfaces — in the note and in the exported PDF.") });
+}
+
+function ngPlotExample() {
+	if (!document.body.dataset.runner) return ngEl("span");
+	const sample = [
+		"```python plot",
+		"import numpy as np, matplotlib.pyplot as plt",
+		"",
+		"x = np.linspace(-2*np.pi, 2*np.pi, 400)",
+		"plt.plot(x, np.sin(x), label=\"sin x\")",
+		"plt.legend(); plt.grid(True)",
+		"```",
+	].join("\n");
+
+	const pre = ngEl("pre", { class: "plot-sample" });
+	pre.appendChild(ngEl("code", { text: sample }));
+
+	const copy = ngEl("button", { type: "button", class: "linklike", text: ngT("Copy") });
+	copy.addEventListener("click", async function () {
+		try {
+			await navigator.clipboard.writeText(sample);
+			copy.textContent = ngT("Copied");
+			setTimeout(function () { copy.textContent = ngT("Copy"); }, 1500);
+		} catch (err) {
+			ngToast(ngT("Could not copy."));
+		}
+	});
+
+	return ngEl("details", { class: "plot-help" }, [
+		ngEl("summary", { text: ngT("How to draw a plot") }),
+		ngEl("p", { class: "page-hint", text: ngT("Any Python fence with the word plot after the language draws itself when the note opens. A plain python fence keeps its Run button and stays put until you press it.") }),
+		pre,
+		ngEl("p", { class: "plot-help-actions" }, [copy]),
+		ngEl("p", { class: "page-hint", text: ngT("The first one in a session takes a few seconds while Python starts. Everything numpy, scipy and sympy can compute is available to it, and nothing leaves this device.") }),
+	]);
+}
+
 async function ngViewIndex() {
 	const host = ngViewHost();
 	const notes = [];
@@ -121,8 +172,10 @@ async function ngViewIndex() {
 					rel: "noopener noreferrer", text: ngT("Every supported function and symbol") }),
 				".",
 			]),
+			ngPlotHint(),
 			ngEl("li", { text: ngT("Everything is stored on this device first and works offline; the server only ever receives a sealed copy.") }),
 		]),
+		ngPlotExample(),
 	]);
 
 	const recent = notes.length

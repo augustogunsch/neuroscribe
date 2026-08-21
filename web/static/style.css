@@ -1223,7 +1223,7 @@ body.is-locked { overflow: hidden; }
 	justify-content: space-between;
 	gap: 1rem;
 	padding: 0.35rem 0;
-	border-bottom: 1px solid var(--line);
+	border-bottom: 1px solid var(--border);
 	font-size: 0.94rem;
 }
 
@@ -1273,4 +1273,34 @@ body.is-locked { overflow: hidden; }
 .plot-figure {
 	display: block;
 	padding: 0.4rem 0.6rem 0.6rem;
+}
+
+/* the plotting instructions on the home page */
+.plot-help {
+	margin: 1.4rem 0 0;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 0.7rem 0.9rem;
+}
+
+.plot-help > summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.plot-help[open] > summary {
+	margin-bottom: 0.6rem;
+}
+
+.plot-sample {
+	margin: 0.6rem 0 0.3rem;
+	padding: 0.7rem 0.9rem;
+	overflow-x: auto;
+	background: var(--bg-soft);
+	border-radius: 6px;
+	font-size: 0.86rem;
+}
+
+.plot-help-actions {
+	margin: 0 0 0.6rem;
 }
