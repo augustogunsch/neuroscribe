@@ -1,5 +1,6 @@
 BINARY  := neuroscribe
 GO      ?= go
+PYTHON  ?= python3
 
 .PHONY: all build release deploy run run-open mail-dev pyodide typst vendor assets test vet fmt check hooks clean \
 	app-bundle app-debug app-release app-publish app-version
@@ -94,6 +95,16 @@ TYPST_VERSION  := 0.7.0
 TYPST_NPM      := https://registry.npmjs.org/@myriaddreamin
 TYPST_ASSETS   := https://raw.githubusercontent.com/typst/typst-assets/main/files/fonts
 MITEX_VERSION  := 0.2.5
+# CeTZ draws; cetz-plot puts axes around it. Together they are 126 KB, and they
+# are what lets a figure be typeset by the same compiler that typesets the
+# document around it — so a plot in a note and the same plot in the PDF are not
+# two renderings that agree, they are one rendering.
+CETZ_VERSION   := 0.3.4
+CETZPLOT_VERSION := 0.1.1
+# CeTZ imports this one for string formatting. Fetched because the compiler has
+# no package registry and is never allowed to reach for one — see
+# scripts/package-manifest.py.
+OXIFMT_VERSION := 0.2.1
 
 # New Computer Modern is the classic TeX face, so exported PDFs read like
 # LaTeX documents. The math font is what makes formulas work at all — Typst
@@ -128,6 +139,32 @@ typst:
 		mkdir -p typst/packages/mitex; \
 		tar xzf typst/dl/mitex-$(MITEX_VERSION).tar.gz -C typst/packages/mitex; \
 	fi
+	@if [ ! -f typst/typst_ts_renderer_bg.wasm ]; then \
+		$(FETCH) $(TYPST_NPM)/typst-ts-renderer/-/typst-ts-renderer-$(TYPST_VERSION).tgz \
+			typst/dl/typst-ts-renderer-$(TYPST_VERSION).tgz || exit 1; \
+		tar xzf typst/dl/typst-ts-renderer-$(TYPST_VERSION).tgz -C typst --strip-components=2 \
+			package/pkg/typst_ts_renderer_bg.wasm package/pkg/typst_ts_renderer.mjs; \
+	fi
+	@if [ ! -f typst/packages/cetz/typst.toml ]; then \
+		$(FETCH) https://packages.typst.org/preview/cetz-$(CETZ_VERSION).tar.gz \
+			typst/dl/cetz-$(CETZ_VERSION).tar.gz || exit 1; \
+		mkdir -p typst/packages/cetz; \
+		tar xzf typst/dl/cetz-$(CETZ_VERSION).tar.gz -C typst/packages/cetz; \
+	fi
+	@if [ ! -f typst/packages/cetz-plot/typst.toml ]; then \
+		$(FETCH) https://packages.typst.org/preview/cetz-plot-$(CETZPLOT_VERSION).tar.gz \
+			typst/dl/cetz-plot-$(CETZPLOT_VERSION).tar.gz || exit 1; \
+		mkdir -p typst/packages/cetz-plot; \
+		tar xzf typst/dl/cetz-plot-$(CETZPLOT_VERSION).tar.gz -C typst/packages/cetz-plot; \
+	fi
+	@if [ ! -f typst/packages/oxifmt/typst.toml ]; then \
+		$(FETCH) https://packages.typst.org/preview/oxifmt-$(OXIFMT_VERSION).tar.gz \
+			typst/dl/oxifmt-$(OXIFMT_VERSION).tar.gz || exit 1; \
+		mkdir -p typst/packages/oxifmt; \
+		tar xzf typst/dl/oxifmt-$(OXIFMT_VERSION).tar.gz -C typst/packages/oxifmt; \
+	fi
+	@$(PYTHON) scripts/package-manifest.py \
+		typst/packages/cetz typst/packages/cetz-plot typst/packages/oxifmt
 	@rm -rf typst/dl
 	@echo "typst ready: $$(du -sh typst | cut -f1)"
 

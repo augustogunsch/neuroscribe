@@ -61,6 +61,9 @@ function boot() {
 			for (const f of NG_MITEX_FILES) {
 				compiler.mapShadow("/mitex/" + f, await fetchBytes(NG_TYPST + "packages/mitex/" + f));
 			}
+			await mapPackage(compiler, "cetz");
+			await mapPackage(compiler, "cetz-plot");
+			await mapPackage(compiler, "oxifmt");
 			return compiler;
 		})().catch((err) => {
 			bootPromise = null; // a failed boot must not poison later attempts
@@ -68,6 +71,68 @@ function boot() {
 		});
 	}
 	return bootPromise;
+}
+
+/* Packages are mapped file by file: the compiler has no filesystem, only the
+ * shadow entries we hand it, and CeTZ is a tree of .typ files that import each
+ * other by relative path. The manifest lists them so nothing has to be
+ * discovered at runtime. */
+async function mapPackage(compiler, name) {
+	const manifest = await (await fetch(NG_TYPST + "packages/" + name + "/files.json")).json();
+	for (const f of manifest) {
+		compiler.mapShadow("/" + name + "/" + f,
+			await fetchBytes(NG_TYPST + "packages/" + name + "/" + f));
+	}
+}
+
+/* The renderer turns typst.ts's own vector format into SVG.
+ *
+ * It is a second wasm module and a second megabyte, loaded only when a note
+ * actually contains a drawing — a document that is only ever exported as a PDF
+ * never needs it, because the compiler reaches PDF on its own.
+ *
+ * renderSvg returns a string. Its sibling renderToSvg wants a DOM container,
+ * which there is none of in here, and putting one within reach would mean
+ * running the renderer on the page — where the policy forbids WebAssembly for
+ * good reasons. */
+let rendererPromise = null;
+
+function renderer() {
+	if (!rendererPromise) {
+		rendererPromise = (async () => {
+			const mod = await import(NG_TYPST + "typst.mjs");
+			const r = mod.createTypstRenderer();
+			await r.init({
+				getWrapper: () => import(NG_TYPST + "typst_ts_renderer.mjs"),
+				getModule: () => NG_TYPST + "typst_ts_renderer_bg.wasm",
+			});
+			return r;
+		})().catch((err) => {
+			rendererPromise = null;
+			throw err;
+		});
+	}
+	return rendererPromise;
+}
+
+// draw compiles one figure and returns it as SVG.
+async function draw(compiler, source) {
+	compiler.addSource("/main.typ", source);
+	const result = await compiler.compile({ mainFilePath: "/main.typ" });
+	const vector = result && result.result ? result.result : result;
+	if (!(vector instanceof Uint8Array)) {
+		const diags = (result && result.diagnostics) || [];
+		throw new Error(diags.length ? (diags[0].message || String(diags[0])) : "could not draw");
+	}
+	// artifactContent rather than a session we manage: renderSvg opens one
+	// around the call and closes it after, which is the difference between
+	// borrowing wasm memory and having to remember to give it back.
+	const r = await renderer();
+	const svg = await r.renderSvg({ artifactContent: vector });
+	if (typeof svg !== "string" || svg.indexOf("<svg") === -1) {
+		throw new Error("the renderer did not return an SVG");
+	}
+	return svg;
 }
 
 async function typeset(compiler, source) {
@@ -89,13 +154,17 @@ async function typeset(compiler, source) {
 }
 
 self.onmessage = async (e) => {
-	const { id, source, files } = e.data || {};
+	const { id, source, files, want } = e.data || {};
 	const mapped = [];
 	try {
 		const compiler = await boot();
 		for (const name of Object.keys(files || {})) {
 			compiler.mapShadow(name, files[name]);
 			mapped.push(name);
+		}
+		if (want === "svg") {
+			self.postMessage({ id: id, svg: await draw(compiler, source) });
+			return;
 		}
 		const pdf = await typeset(compiler, source);
 		// hand the bytes over rather than copying them

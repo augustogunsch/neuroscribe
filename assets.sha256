@@ -50,6 +50,16 @@ decbe5b1367b9890a30d8b1f0d5d5a062af628d3b3ccc59112cf3c53f7c6b84b  pyodide/cycler
 
 d1e6fe0c33c06b2c1158cf8374b66332961be34cf283a4b944a2308d86ac59aa  typst/dl/mitex-0.2.5.tar.gz
 
+# ---- the renderer: typst.ts compiles to its own vector format, and this turns
+# that into SVG. The compiler alone can only reach PDF, which is no use for
+# showing a figure inside a note. ----
+9d565c18c2d4e2f93a5631300cb11963cc3ba8394434c2766f6deca69b5696ad  typst/dl/typst-ts-renderer-0.7.0.tgz
+
+# ---- CeTZ 0.3.4 and cetz-plot 0.1.1: drawing and charts, in Typst itself ----
+4f4b5a8d311d519e749940a766fe50521e40c041129e1c91af0c42e61f307514  typst/dl/cetz-0.3.4.tar.gz
+f057107e2c4bbfc92e2494054a22c90e146a22e0136ee04f68a7728347685d75  typst/dl/cetz-plot-0.1.1.tar.gz
+16fac2923032c59727de01e84d42cac45e8790da28df56effca49f4de41b09d9  typst/dl/oxifmt-0.2.1.tar.gz
+
 # ---- Fonts ----
 # raw.githubusercontent.com/typst/typst-assets/main — `main` is a moving
 # target, so these hashes are the only thing fixing what gets served.

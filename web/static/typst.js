@@ -22,7 +22,7 @@ let ngTypstWorker = null;
 let ngTypstSeq = 0;
 const ngTypstPending = new Map();
 
-function ngTypstSend(source, files) {
+function ngTypstSend(source, files, want) {
 	if (!ngTypstWorker) {
 		ngTypstWorker = new Worker("/static/typst-worker.js", { type: "module" });
 		ngTypstWorker.onmessage = (e) => {
@@ -30,7 +30,7 @@ function ngTypstSend(source, files) {
 			if (!waiting) return;
 			ngTypstPending.delete(e.data.id);
 			if (e.data.error) waiting.reject(new Error(e.data.error));
-			else waiting.resolve(e.data.pdf);
+			else waiting.resolve(e.data.svg !== undefined ? e.data.svg : e.data.pdf);
 		};
 		ngTypstWorker.onerror = (e) => {
 			// a worker that failed to start will never answer anyone
@@ -53,8 +53,33 @@ function ngTypstSend(source, files) {
 			resolve: (v) => { clearTimeout(timer); resolve(v); },
 			reject: (e) => { clearTimeout(timer); reject(e); },
 		});
-		ngTypstWorker.postMessage({ id: id, source: source, files: files });
+		ngTypstWorker.postMessage({ id: id, source: source, files: files, want: want });
 	});
+}
+
+/* ---- CeTZ figures ----
+ *
+ * A ```plot fence is Typst, drawn by the same compiler that typesets the PDF.
+ * That is the whole reason to have it: the figure in the note and the figure
+ * in the document are not two renderings that agree, they are one rendering.
+ *
+ * The preamble is deliberately small. It puts cetz and cetz-plot within reach,
+ * gives the page no margin and no size of its own so the drawing decides its
+ * own bounds, and gets out of the way.
+ */
+const NG_CETZ_PREAMBLE = `#import "/cetz/src/lib.typ" as cetz: draw, canvas
+#import "/cetz-plot/src/lib.typ": plot, chart
+
+#set page(width: auto, height: auto, margin: 4pt, fill: none)
+#set text(font: "New Computer Modern", size: 10pt)
+
+`;
+
+// ngCetzFigure draws one fence and returns SVG. The directives a fence may
+// carry are comments in Typst too, so the source stays something you could
+// paste into a .typ file.
+async function ngCetzFigure(code) {
+	return ngTypstSend(NG_CETZ_PREAMBLE + String(code || ""), {}, "svg");
 }
 
 /* ---- emitting Typst source ---- */
