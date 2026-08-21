@@ -141,6 +141,33 @@ func TestPythonIsWarmedBeforeItIsNeeded(t *testing.T) {
 	}
 }
 
+// The typesetter's SVG arrives carrying a script.
+//
+// Left to itself the renderer emits four parts, and one of them is JavaScript
+// that builds a selectable text layer at run time. That is harmless in the page
+// it was designed for and would not be harmless here: this SVG is produced from
+// a note, and the page that would hold it holds the key to every other note. It
+// never reaches the page as markup — it goes into an <img>, which cannot run it
+// — but the renderer is also asked not to produce it, so that the <img> is the
+// second line of defence rather than the only one.
+func TestTheDrawingCarriesNoCode(t *testing.T) {
+	worker := readAsset(t, "static/typst-worker.js")
+
+	if !strings.Contains(worker, "data_selection") || !strings.Contains(worker, "js: false") {
+		t.Error("the renderer is no longer asked for the drawing only; " +
+			"its output would carry a script")
+	}
+	// And refused outright if one appears anyway.
+	if !strings.Contains(worker, "<script") {
+		t.Error("a drawing containing a script would be shown rather than refused")
+	}
+	// foreignObject is HTML inside SVG, and an <img> renders none of a document
+	// that contains it — the figure would silently not appear at all.
+	if !strings.Contains(worker, "foreignObject") {
+		t.Error("the selection layer is no longer removed; figures will not display")
+	}
+}
+
 // The same SVG goes into the note and into the PDF. That is the whole reason
 // the two agree, so the PDF must take the figure as a file and not re-draw it.
 func TestThePDFEmbedsTheSameFigure(t *testing.T) {

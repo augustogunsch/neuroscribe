@@ -124,15 +124,62 @@ async function draw(compiler, source) {
 		const diags = (result && result.diagnostics) || [];
 		throw new Error(diags.length ? (diags[0].message || String(diags[0])) : "could not draw");
 	}
-	// artifactContent rather than a session we manage: renderSvg opens one
-	// around the call and closes it after, which is the difference between
-	// borrowing wasm memory and having to remember to give it back.
+	/* artifactContent rather than a session we manage: renderSvg opens one
+	 * around the call and closes it after, which is the difference between
+	 * borrowing wasm memory and having to remember to give it back.
+	 *
+	 * data_selection is the load-bearing part. Left to itself the renderer
+	 * emits four things — the drawing, its definitions, some CSS, and a
+	 * script — and the script is not decoration: it builds a selectable text
+	 * layer at run time, which means the SVG arrives carrying code. A picture
+	 * of a note is not a place to accept code from. Asking for the three parts
+	 * that draw is better than deleting the fourth afterwards, because it
+	 * cannot be got wrong by a change in how that code is written.
+	 */
 	const r = await renderer();
-	const svg = await r.renderSvg({ artifactContent: vector });
+	const svg = await r.renderSvg({
+		artifactContent: vector,
+		data_selection: { body: true, defs: true, css: true, js: false },
+	});
 	if (typeof svg !== "string" || svg.indexOf("<svg") === -1) {
 		throw new Error("the renderer did not return an SVG");
 	}
-	return svg;
+	return flatten(svg);
+}
+
+/* The typesetter draws each glyph twice: once as vector outlines, and once
+ * again inside a <foreignObject> as HTML, invisible, so that text in a page can
+ * be selected and searched.
+ *
+ * That second layer is why the picture would not appear. An SVG shown through
+ * an <img> is rendered in a context with no HTML in it at all, and a document
+ * carrying foreignObject is not drawn there — not partially, not without the
+ * text: the image fails and nothing is shown. Inlining the SVG instead would
+ * mean putting markup built from a note into the page, which is the one thing
+ * the sanitizer exists to prevent.
+ *
+ * So the layer is removed here, where the drawing is made, and what leaves this
+ * worker is an SVG an <img> will take. What it costs is selecting the text of a
+ * figure. What it keeps is every stroke: the outlines are a separate layer and
+ * none of them live in here — an axis label is drawn as paths whether or not it
+ * can also be selected.
+ */
+function flatten(svg) {
+	const stripped = svg.replace(/<foreignObject\b[^>]*>[\s\S]*?<\/foreignObject>/g, "");
+	// An unbalanced document would mean the shape changed and the pattern is
+	// removing more, or less, than it should.
+	const left = stripped.indexOf("foreignObject");
+	if (left !== -1) {
+		throw new Error("foreignObject survived the strip, near: " +
+			stripped.slice(Math.max(0, left - 60), left + 80));
+	}
+	// Nothing executable, ever. The <img> this ends up in would not run it
+	// anyway; the point is that no later change quietly makes that the only
+	// thing standing between a note and the page holding the keys.
+	if (/<script\b/i.test(stripped)) {
+		throw new Error("the drawing contains a script and will not be shown");
+	}
+	return stripped;
 }
 
 async function typeset(compiler, source) {
