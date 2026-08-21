@@ -150,6 +150,45 @@ const ok = (cond, what) => log((cond ? "ok   " : "FAIL ") + what);
     ok(false, "the PDF builds — " + (err && err.message || err));
   }
 
+  // ---- 5. every fence the documentation shows, in both modes ----
+  const DOCUMENTED = {
+    "README code form": `//: label=wave
+//: A sine wave over two periods.
+canvas({
+  plot.plot(size: (8, 5), x-tick-step: 2, y-tick-step: 0.5, {
+    plot.add(domain: (-2*calc.pi, 2*calc.pi), x => calc.sin(x))
+  })
+})`,
+    "README markup form": `#import "@preview/cetz:0.3.2"
+#import cetz.draw: *
+
+#cetz.canvas({
+  line((0, 0), (2, 1), mark: (end: ">"))
+})`,
+    "in-app sample": `//: label=wave
+//: A sine wave over two periods.
+#import "@preview/cetz:0.3.2"
+#import "@preview/cetz-plot:0.1.1": plot
+
+#cetz.canvas({
+  plot.plot(size: (8, 5), x-tick-step: 2, y-tick-step: 0.5, {
+    plot.add(domain: (-2*calc.pi, 2*calc.pi), x => calc.sin(x))
+  })
+})`,
+  };
+  for (const [name, code] of Object.entries(DOCUMENTED)) {
+    try {
+      const svg = await ngCetzFigure(code);
+      // markup mode typesets its own source instead of running it, and that
+      // failure is silent: you get a figure, it is a picture of the code
+      const literal = svg.includes("canvas(") || svg.includes("#import");
+      ok(svg.includes("<svg") && !literal,
+        name + " draws (" + svg.length + " bytes)" + (literal ? " — TYPESET AS TEXT" : ""));
+    } catch (err) {
+      ok(false, name + " draws — " + (err && err.message || err));
+    }
+  }
+
   log("DONE");
 })().catch(e => log("HARNESS BROKE: " + (e && e.stack || e)));
 </script>

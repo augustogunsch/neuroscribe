@@ -109,19 +109,50 @@ function ngCurrentNoteRef() {
  * can lift straight into a note says it better than a paragraph would.
  */
 
+// Which engines this server can actually offer. Each needs its own runtime,
+// and promising a feature the server does not have is an instruction that ends
+// in a shrug.
+function ngPlotEngines() {
+	return {
+		cetz: !!document.body.dataset.typst,
+		python: !!document.body.dataset.runner,
+	};
+}
+
 function ngPlotHint() {
-	if (!document.body.dataset.runner) {
-		// Saying "add plot to a Python block" on a server that cannot run
-		// Python is an instruction that ends in a shrug.
+	const have = ngPlotEngines();
+	if (!have.cetz && !have.python) {
 		return ngEl("li", { class: "run-meta",
-			text: ngT("Plotting needs the Python runtime, which this server does not have: run `make pyodide` to add it.") });
+			text: ngT("Drawing needs a runtime this server does not have: run `make assets` to add them.") });
+	}
+	if (have.cetz) {
+		return ngEl("li", { text: ngT("A plot block draws itself when the note opens — charts, function graphs, vectors and geometry — as part of the same typesetting that makes your PDFs, so the note and the document show one drawing rather than two that agree.") });
 	}
 	return ngEl("li", { text: ngT("Add plot to a Python block and it draws itself with matplotlib — charts, function graphs, vector fields and 3D surfaces — in the note and in the exported PDF.") });
 }
 
 function ngPlotExample() {
-	if (!document.body.dataset.runner) return ngEl("span");
-	const sample = [
+	const have = ngPlotEngines();
+	if (!have.cetz && !have.python) return ngEl("span");
+
+	// The faster engine, when it is there. A fence someone can lift straight
+	// into a note says it better than a paragraph would, so this is the shape
+	// the examples on the web have: the import included, because that is what
+	// people paste and it is meant to work.
+	const sample = have.cetz ? [
+		"```plot",
+		"//: label=wave",
+		"//: A sine wave over two periods.",
+		"#import \"@preview/cetz:0.3.2\"",
+		"#import \"@preview/cetz-plot:0.1.1\": plot",
+		"",
+		"#cetz.canvas({",
+		"  plot.plot(size: (8, 5), x-tick-step: 2, y-tick-step: 0.5, {",
+		"    plot.add(domain: (-2*calc.pi, 2*calc.pi), x => calc.sin(x))",
+		"  })",
+		"})",
+		"```",
+	].join("\n") : [
 		"```python plot",
 		"import numpy as np, matplotlib.pyplot as plt",
 		"",
@@ -145,13 +176,26 @@ function ngPlotExample() {
 		}
 	});
 
-	return ngEl("details", { class: "plot-help" }, [
+	const parts = [
 		ngEl("summary", { text: ngT("How to draw a plot") }),
-		ngEl("p", { class: "page-hint", text: ngT("Any Python fence with the word plot after the language draws itself when the note opens. A plain python fence keeps its Run button and stays put until you press it.") }),
+		ngEl("p", { class: "page-hint", text: have.cetz
+			? ngT("A plot fence is drawn by the typesetter. Start a line with //: to caption it, or //: label=name to give it a name that @name points at from the prose.")
+			: ngT("Any Python fence with the word plot after the language draws itself when the note opens. A plain python fence keeps its Run button and stays put until you press it.") }),
 		pre,
 		ngEl("p", { class: "plot-help-actions" }, [copy]),
-		ngEl("p", { class: "page-hint", text: ngT("The first one in a session takes a few seconds while Python starts. Everything numpy, scipy and sympy can compute is available to it, and nothing leaves this device.") }),
-	]);
+	];
+	if (have.cetz) {
+		// Two things people hit on their first fence: pasted examples import
+		// by version, and a body that opens with "#" is markup rather than a
+		// sequence of expressions.
+		parts.push(ngEl("p", { class: "page-hint", text: ngT("Examples copied from the web work as written — the import is pointed at the copy kept here, whichever version it names. Nothing is downloaded, and nothing leaves this device.") }));
+	}
+	if (have.cetz && have.python) {
+		parts.push(ngEl("p", { class: "page-hint", text: ngT("For 3D surfaces, or anything numpy, scipy and sympy can compute, write python plot instead. The first of those in a session takes a few seconds while Python starts.") }));
+	} else if (have.python) {
+		parts.push(ngEl("p", { class: "page-hint", text: ngT("The first one in a session takes a few seconds while Python starts. Everything numpy, scipy and sympy can compute is available to it, and nothing leaves this device.") }));
+	}
+	return ngEl("details", { class: "plot-help" }, parts);
 }
 
 async function ngViewIndex() {

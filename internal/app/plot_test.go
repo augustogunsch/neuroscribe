@@ -370,3 +370,83 @@ func TestTheNoteAndThePDFWrapAFigureTheSameWay(t *testing.T) {
 		t.Error("the markup-versus-code decision is gone; one of the two forms will fail")
 	}
 }
+
+// The manual on the index page is the only instructions most people read, and
+// it named one engine after there were two — telling someone to write a Python
+// fence on a server whose fast path is the typesetter.
+//
+// It also has to match what the server can do. Each engine needs its own
+// runtime, and the page is told which are present; promising a feature that is
+// not installed is an instruction ending in a shrug.
+func TestTheManualDescribesTheEnginesThisServerHas(t *testing.T) {
+	views := readAsset(t, "static/views.js")
+
+	// Every check below matches through to a delimiter — a "(", a quote, a
+	// colon. strings.Contains is happy with any superstring, so an assertion
+	// that stops at a name passes when that name is renamed or extended, and
+	// three of these did exactly that until the mutations caught them.
+	if !strings.Contains(views, "function ngPlotEngines()") {
+		t.Fatal("the help no longer asks which engines exist")
+	}
+
+	// Each engine gated on its own flag: data-typst is the typesetter,
+	// data-runner is Python. One standing in for the other is how the help
+	// came to offer matplotlib on a server that had only the typesetter.
+	for _, pair := range [][2]string{
+		{"cetz: !!document.body.dataset.typst", "the typesetter"},
+		{"python: !!document.body.dataset.runner", "Python"},
+	} {
+		if !strings.Contains(views, pair[0]) {
+			t.Errorf("%s is no longer gated on its own runtime flag", pair[1])
+		}
+	}
+
+	// The sample is meant to be copied, so it must be the shape that works —
+	// with the import, which is the line people paste and the line that used
+	// to fail. scripts/pipeline-harness.html compiles this exact snippet.
+	if !strings.Contains(views, "have.cetz ? [") {
+		t.Error("the sample no longer depends on which engine is present")
+	}
+	if !strings.Contains(views, "\"```plot\"") {
+		t.Error("the copyable sample no longer offers a CeTZ fence")
+	}
+	if !strings.Contains(views, "@preview/cetz:") {
+		t.Error("the sample dropped the import, which is the line people paste")
+	}
+
+	// And every string it shows has a translation, since the app ships one.
+	//
+	// The whole sentence is compared, not a recognisable piece of it: these
+	// strings are themselves the lookup keys, so a word changed anywhere in
+	// one silently turns it into a key nothing translates. Checking a prefix
+	// cannot see that — the mutation that proved it appended a letter to the
+	// end of a key and every prefix assertion still passed.
+	pt := string(repoFile(t, "internal/app/i18n_pt_br.go"))
+	said := regexp.MustCompile(`ngT\("((?:[^"\\]|\\.)*)"\)`)
+	found := map[string]bool{}
+	for _, m := range said.FindAllStringSubmatch(views, -1) {
+		found[m[1]] = true
+	}
+	for _, opening := range []string{
+		"A plot block draws itself when the note opens",
+		"A plot fence is drawn by the typesetter",
+		"Examples copied from the web work as written",
+		"Drawing needs a runtime this server does not have",
+		"For 3D surfaces",
+	} {
+		whole := ""
+		for s := range found {
+			if strings.HasPrefix(s, opening) {
+				whole = s
+				break
+			}
+		}
+		if whole == "" {
+			t.Errorf("the help no longer says anything starting %q", opening)
+			continue
+		}
+		if !strings.Contains(pt, `"`+whole+`":`) {
+			t.Errorf("no pt-BR translation for the exact string %q", whole)
+		}
+	}
+}

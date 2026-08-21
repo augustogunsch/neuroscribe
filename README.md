@@ -321,6 +321,33 @@ shapes, geometry and trees; cetz-plot puts axes, charts and legends around
 them. It cannot do 3D surfaces and has no numerical library — for those, use
 the Python fence.
 
+**A fence is code unless it starts with `#`.** Those are the two ways to write
+Typst and a drawing can be either, so the first character decides. The example
+above is a sequence of expressions, which is code. The one below opens with an
+import, so it is markup — and inside markup a `#` is how you get back to code,
+which is why every line that calls something has one:
+
+````markdown
+```plot
+#import "@preview/cetz:0.3.2"
+#import cetz.draw: *
+
+#cetz.canvas({
+  line((0, 0), (2, 1), mark: (end: ">"))
+})
+```
+````
+
+Both forms work in the note and in the PDF, which are one rendering. Mixing
+them is what does not: a `#` in the middle of the first form is a syntax error,
+and a bare `canvas(…)` in the second is typeset as its own source — you get a
+figure, it is just a picture of the words you wrote.
+
+**`$…$` inside a fence is Typst math, not note math.** The note's own `$…$` is
+LaTeX and is rendered before Markdown is parsed; inside a fence it is left
+exactly as written, so `label: $alpha$` reaches CeTZ intact. The same goes for
+a `$` in any other fence — a shell block keeps its `$PATH`.
+
 Examples on the web open with a registry import, and pasting one in works:
 
 ```typst
