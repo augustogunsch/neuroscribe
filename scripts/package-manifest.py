@@ -23,11 +23,17 @@ import os
 import re
 import sys
 
-# where each package's entrypoint is mapped inside the compiler
+# Where each package's entrypoint is mapped inside the compiler.
+#
+# Used twice, and the second use is why mitex is in the list even though this
+# script never rewrites it: web/static/typst-worker.js keeps the same table for
+# the imports people write in their own notes, and a test compares the two. A
+# package present in one and not the other draws nothing.
 ENTRYPOINTS = {
     "cetz": "/cetz/src/lib.typ",
     "cetz-plot": "/cetz-plot/src/lib.typ",
     "oxifmt": "/oxifmt/oxifmt.typ",
+    "mitex": "/mitex/lib.typ",
 }
 
 REGISTRY_IMPORT = re.compile(r'"@preview/([a-z0-9-]+):[0-9.]+"')
@@ -97,6 +103,49 @@ def main(dirs):
         print(f"{pkg}: {len(files)} files{note}")
 
 
+def compute(root):
+    """The version a directory's contents add up to."""
+    digest = hashlib.sha256()
+    for dirpath, dirs, names in os.walk(root):
+        dirs.sort()
+        for n in sorted(names):
+            if n == "manifest.json":
+                continue
+            full = os.path.join(dirpath, n)
+            digest.update(os.path.relpath(full, root).encode())
+            with open(full, "rb") as f:
+                for chunk in iter(lambda: f.read(1 << 20), b""):
+                    digest.update(chunk)
+    return digest.hexdigest()[:12]
+
+
+def check(root):
+    """Fail if the stamp does not match what is on disk.
+
+    A stale manifest is worse than no manifest: every address a browser builds
+    from it is wrong in the same way, so the old files keep being served and
+    nothing looks broken until something needs the new ones.
+    """
+    path = os.path.join(root, "manifest.json")
+    if not os.path.isfile(path):
+        raise SystemExit(f"{root}: no manifest.json — run `make typst`")
+    try:
+        with open(path, encoding="utf-8") as f:
+            recorded = json.load(f).get("version")
+    except (json.JSONDecodeError, UnicodeDecodeError, AttributeError):
+        # An empty or truncated manifest is a copy that was interrupted, which
+        # is exactly the case this exists to catch. Saying so beats a traceback.
+        raise SystemExit(
+            f"{root}: manifest.json is not readable JSON — the copy is "
+            f"incomplete. Run `make typst`.")
+    actual = compute(root)
+    if recorded != actual:
+        raise SystemExit(
+            f"{root}: manifest says {recorded}, contents are {actual}.\n"
+            f"Something changed without being stamped; run `make typst`.")
+    print(f"{root}: version {actual}, matches contents")
+
+
 def stamp(root):
     """Write a version covering everything served from this directory.
 
@@ -111,18 +160,7 @@ def stamp(root):
     and everything else is fetched with the version on the end of its address.
     A change to any byte changes every address, once.
     """
-    digest = hashlib.sha256()
-    for dirpath, dirs, names in os.walk(root):
-        dirs.sort()
-        for n in sorted(names):
-            if n == "manifest.json":
-                continue
-            full = os.path.join(dirpath, n)
-            digest.update(os.path.relpath(full, root).encode())
-            with open(full, "rb") as f:
-                for chunk in iter(lambda: f.read(1 << 20), b""):
-                    digest.update(chunk)
-    version = digest.hexdigest()[:12]
+    version = compute(root)
     with open(os.path.join(root, "manifest.json"), "w", encoding="utf-8") as f:
         json.dump({"version": version}, f)
     print(f"{root}: version {version}")
@@ -133,5 +171,7 @@ if __name__ == "__main__":
         raise SystemExit(__doc__)
     if sys.argv[1] == "--stamp":
         stamp(sys.argv[2])
+    elif sys.argv[1] == "--check":
+        check(sys.argv[2])
     else:
         main(sys.argv[1:])

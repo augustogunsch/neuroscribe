@@ -321,6 +321,29 @@ shapes, geometry and trees; cetz-plot puts axes, charts and legends around
 them. It cannot do 3D surfaces and has no numerical library — for those, use
 the Python fence.
 
+Examples on the web open with a registry import, and pasting one in works:
+
+```typst
+#import "@preview/cetz:0.3.4"
+#import cetz.draw: *
+```
+
+That line is rewritten to the copy kept on the server, because nothing here
+reaches a package registry — a note is typeset without anything leaving the
+browser. The version in the string is ignored, so you get what was fetched:
+
+| | |
+|---|---|
+| cetz | 0.3.2 |
+| cetz-plot | 0.1.1 |
+| oxifmt | 0.2.1 |
+| mitex | 0.2.5 |
+
+Ask for a package that is not on that list and the figure says so by name
+rather than failing inside the compiler. To add one, put it in the `typst`
+target in the Makefile and in `ENTRYPOINTS` in `scripts/package-manifest.py`;
+a test checks that list against the one the browser uses.
+
 ### `python plot` — matplotlib
 
 Everything numpy, scipy and sympy can compute, plus 3D.

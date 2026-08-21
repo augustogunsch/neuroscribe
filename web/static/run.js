@@ -415,6 +415,24 @@ function ngPlotFrame(block, meta) {
 	return { figure: figure, stage: stage, source: source, toggle: toggle, note: note };
 }
 
+// The one line of an error worth showing.
+//
+// Two very different shapes arrive here. A Python traceback saves its point
+// for last, under the frames; a panic out of the Typst compiler leads with it
+// and then unwinds through wasm. Taking the last line reads the first
+// correctly and the second exactly backwards — it shows an address inside a
+// .wasm file, which says nothing at all about the drawing that failed.
+//
+// So drop what is plainly a stack frame and take the last of what is left:
+// that is the traceback's verdict, and it is the panic's message once its
+// frames are gone.
+function ngErrorLine(message) {
+	const lines = String(message).split("\n").map((l) => l.trim()).filter(Boolean);
+	const said = lines.filter((l) => !/^(at\b|File "|\^+$)/.test(l) && !/wasm-function/.test(l));
+	const line = said.length ? said[said.length - 1] : lines[0] || "";
+	return line.length > 300 ? line.slice(0, 300) + "…" : line;
+}
+
 // Nothing drew, so there is no figure: show the source, since the reason is in
 // it, and leave the caption unnumbered rather than number a hole.
 function ngPlotFailed(parts, message) {
@@ -423,7 +441,7 @@ function ngPlotFailed(parts, message) {
 	parts.toggle.hidden = true;
 	parts.note.className = "run-meta run-bad";
 	parts.note.textContent = message
-		? ngT("The plot could not be drawn.") + " " + String(message).split("\n").pop()
+		? ngT("The plot could not be drawn.") + " " + ngErrorLine(message)
 		: ngT("That snippet drew no figure.");
 }
 

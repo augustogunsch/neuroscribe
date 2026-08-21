@@ -59,6 +59,67 @@ const NG_MITEX_FILES = [
 	"specs/mod.typ", "specs/prelude.typ", "specs/latex/standard.typ",
 ];
 
+/* Where each vendored package's entrypoint sits in the compiler's filesystem.
+ *
+ * The same table exists in scripts/package-manifest.py, which applies it to the
+ * packages themselves at fetch time. This copy is for what people write. The
+ * two are checked against each other by a test, because a name in one and not
+ * the other is the kind of difference that shows up as a drawing that will not
+ * draw. */
+const NG_PACKAGE_ENTRY = {
+	"cetz": "/cetz/src/lib.typ",
+	"cetz-plot": "/cetz-plot/src/lib.typ",
+	"oxifmt": "/oxifmt/oxifmt.typ",
+	"mitex": "/mitex/lib.typ",
+};
+
+/* Every CeTZ example ever published opens with `#import "@preview/cetz:0.3.4"`,
+ * so that is what people paste into a fence, and it is right — it is how the
+ * package is named everywhere else.
+ *
+ * It is also an address in a registry, and this compiler has no registry: the
+ * whole point of vendoring the packages is that typesetting a note reaches
+ * nothing. Left alone the import fails somewhere inside the compiler, and what
+ * comes back names a file path rather than the line that asked for it.
+ *
+ * So the import is pointed at the local copy, exactly as the packages' own
+ * cross-imports already are. The version in the string is dropped, and that is
+ * a real limit worth being plain about: a fence asking for 0.3.4 gets the
+ * 0.3.2 that was fetched, and if it uses something 0.3.4 added, the error will
+ * name the missing symbol. That beats failing at the import.
+ *
+ * A package we do not have is left exactly as written, so the compiler's own
+ * complaint arrives with the package's name in it.
+ */
+const NG_REGISTRY_IMPORT = /((?:#\s*)?\bimport\s+)"@preview\/([a-z0-9-]+):[0-9][^"]*"(\s*as\b)?/g;
+
+function ngLocalise(source) {
+	const missing = [];
+	const out = String(source).replace(NG_REGISTRY_IMPORT, (whole, kw, name, as) => {
+		const entry = NG_PACKAGE_ENTRY[name];
+		if (!entry) {
+			missing.push(name);
+			return whole;
+		}
+		// `#import "…"` with no items binds the file's stem — `lib` — where the
+		// registry form binds the package. Naming it back keeps `cetz.draw`
+		// working, which is what the next line of a pasted example says. An
+		// import that already renames it is left to do so.
+		return as ? kw + '"' + entry + '"' + as : kw + '"' + entry + '" as ' + name;
+	});
+	/* Said here rather than left to the compiler. Asking it for a package it
+	 * cannot reach produces a stack of wasm addresses wrapped around the words
+	 * "Dummy Registry", which names neither the package nor the problem. This
+	 * names both, and says what there is instead. */
+	if (missing.length) {
+		throw new Error("this note asks for " +
+			missing.map((n) => "@preview/" + n).join(", ") +
+			", and packages are not downloaded — the ones kept here are " +
+			Object.keys(NG_PACKAGE_ENTRY).sort().join(", ") + ".");
+	}
+	return out;
+}
+
 let bootPromise = null;
 let pdfFormat = 1; // CompileFormatEnum.pdf, replaced with the real value on boot
 
@@ -152,7 +213,7 @@ function renderer() {
 
 // draw compiles one figure and returns it as SVG.
 async function draw(compiler, source) {
-	compiler.addSource("/main.typ", source);
+	compiler.addSource("/main.typ", ngLocalise(source));
 	const result = await compiler.compile({ mainFilePath: "/main.typ" });
 	const vector = result && result.result ? result.result : result;
 	if (!(vector instanceof Uint8Array)) {
@@ -218,7 +279,7 @@ function flatten(svg) {
 }
 
 async function typeset(compiler, source) {
-	compiler.addSource("/main.typ", source);
+	compiler.addSource("/main.typ", ngLocalise(source));
 	const result = await compiler.compile({ mainFilePath: "/main.typ", format: pdfFormat });
 	// typst.ts reports failures as diagnostics rather than by throwing
 	const bytes = result && result.result ? result.result : result;

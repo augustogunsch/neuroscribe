@@ -9,6 +9,7 @@ package app
 // markup.
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -214,5 +215,102 @@ func TestThePDFEmbedsTheSameFigure(t *testing.T) {
 	// A figure the compiler refuses must cost the figure, not the document.
 	if !strings.Contains(typst, "plots: {}") {
 		t.Error("the export no longer falls back to a PDF without figures")
+	}
+}
+
+// Every CeTZ example in the world opens with `#import "@preview/cetz:0.3.4"`,
+// because that is how the package is named everywhere outside this app. Inside
+// it there is no registry to name it in — the packages are vendored precisely
+// so that typesetting reaches nothing — and the compiler answers a registry
+// import with a wasm stack trace that mentions neither the package nor the
+// line.
+//
+// So the import is pointed at the local copy before compiling. What makes this
+// worth holding down is that the failure is invisible from the code: the fence
+// is correct, the package is present, and the drawing still does not appear.
+func TestAPastedExampleWorksAsWritten(t *testing.T) {
+	worker := readAsset(t, "static/typst-worker.js")
+
+	if !strings.Contains(worker, "ngLocalise") {
+		t.Fatal("registry imports are no longer localised")
+	}
+	// Both compiles, or a figure works and its PDF does not.
+	if n := strings.Count(worker, `addSource("/main.typ", ngLocalise(source))`); n != 2 {
+		t.Errorf("%d of 2 compiles localise their imports", n)
+	}
+	// The registry form binds the package name; the path form binds the file
+	// stem, `lib`. Without renaming it back, the `cetz.draw` on the next line
+	// of every example stops resolving.
+	if !strings.Contains(worker, `'" as ' + name`) {
+		t.Error("the import no longer keeps the package's name, so cetz.draw breaks")
+	}
+
+	// The table of what is vendored exists twice: here for what people write,
+	// and in the fetch script for what the packages themselves import. A name
+	// in one and not the other is a drawing that will not draw.
+	names := func(src string) map[string]string {
+		found := map[string]string{}
+		re := regexp.MustCompile(`"([a-z0-9-]+)":\s*"(/[a-z0-9-]+/[^"]+\.typ)"`)
+		for _, m := range re.FindAllStringSubmatch(src, -1) {
+			found[m[1]] = m[2]
+		}
+		return found
+	}
+	fromWorker := names(worker)
+	fromScript := names(string(repoFile(t, "scripts/package-manifest.py")))
+	if len(fromWorker) == 0 || len(fromScript) == 0 {
+		t.Fatal("could not find the entrypoint tables; the shape changed")
+	}
+	for name, entry := range fromWorker {
+		if other, ok := fromScript[name]; !ok {
+			t.Errorf("%s is mapped for notes but unknown to the fetch script", name)
+		} else if other != entry {
+			t.Errorf("%s is mapped at %s for notes and %s for packages", name, entry, other)
+		}
+	}
+	for name := range fromScript {
+		if _, ok := fromWorker[name]; !ok {
+			t.Errorf("%s is fetched but a note cannot import it", name)
+		}
+	}
+
+	// The README tells people which version their pasted import will actually
+	// get, which only helps while it is true. A version bump that does not
+	// reach the prose is worse than no prose: it sends someone looking for a
+	// function in the wrong release notes.
+	makefile := string(repoFile(t, "Makefile"))
+	readme := string(repoFile(t, "README.md"))
+	pinned := regexp.MustCompile(`(?m)^([A-Z]+)_VERSION\s*:=\s*([0-9.]+)`)
+	for _, m := range pinned.FindAllStringSubmatch(makefile, -1) {
+		pkg, version := strings.ToLower(m[1]), m[2]
+		switch pkg {
+		case "mitex", "cetz", "oxifmt":
+		case "cetzplot":
+			pkg = "cetz-plot"
+		default:
+			continue // the compiler and the fonts are not packages
+		}
+		row := "| " + pkg + " | " + version + " |"
+		if !strings.Contains(readme, row) {
+			t.Errorf("the Makefile pins %s %s; the README does not say so", pkg, version)
+		}
+	}
+}
+
+// What a failure says. Two kinds arrive: a Python traceback puts its point
+// last, under the frames, and a panic out of the compiler puts it first and
+// then unwinds through wasm. Taking the last line reads one right and the
+// other exactly backwards — it shows an address inside a .wasm file, which
+// tells the person nothing about the drawing that failed.
+func TestTheReasonIsWhatIsShown(t *testing.T) {
+	run := readAsset(t, "static/run.js")
+	if !strings.Contains(run, "function ngErrorLine") {
+		t.Fatal("errors are no longer trimmed deliberately")
+	}
+	if strings.Contains(run, `String(message).split("\n").pop()`) {
+		t.Error("the last line is shown again, which is a stack frame for a compiler panic")
+	}
+	if !strings.Contains(run, "wasm-function") {
+		t.Error("wasm frames are no longer recognised as frames")
 	}
 }

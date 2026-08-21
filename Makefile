@@ -2,7 +2,7 @@ BINARY  := neuroscribe
 GO      ?= go
 PYTHON  ?= python3
 
-.PHONY: all build release deploy run run-open mail-dev pyodide typst vendor assets test vet fmt check hooks clean \
+.PHONY: all build release deploy check-runtime run run-open mail-dev pyodide typst vendor assets test vet fmt check hooks clean \
 	app-bundle app-debug app-release app-publish app-version
 
 all: build
@@ -165,8 +165,10 @@ typst:
 	fi
 	@$(PYTHON) scripts/package-manifest.py \
 		typst/packages/cetz typst/packages/cetz-plot typst/packages/oxifmt
-	@$(PYTHON) scripts/package-manifest.py --stamp typst
 	@rm -rf typst/dl
+	# after the download directory is gone, or the stamp would cover files that
+	# are about to be deleted and be stale the moment it is written
+	@$(PYTHON) scripts/package-manifest.py --stamp typst
 	@echo "typst ready: $$(du -sh typst | cut -f1)"
 
 # Vendored browser libraries (DOMPurify, marked, KaTeX, Altcha, zxcvbn) live in
@@ -200,8 +202,57 @@ DEPLOY_SERVICE ?= neuroscribe
 # same connection. The master lingers two minutes, so a quick redeploy is free.
 # The socket lives under ~/.ssh (0700) with a hashed name (%C), not in
 # world-writable /tmp where its predictable path invites squatting or hijack.
+# What a complete runtime looks like. Only sentinels — one file per thing that
+# has to have been fetched — because this runs before every deploy and the
+# point is to catch "never fetched" and "half fetched", not to re-verify
+# 139 MB of bytes. `make assets` does that: fetch.sh re-checks every file it
+# finds against its pin.
+RUNTIME_TYPST := manifest.json typst.mjs compiler.mjs \
+	typst_ts_web_compiler_bg.wasm typst_ts_renderer_bg.wasm \
+	packages/mitex/lib.typ \
+	packages/cetz/typst.toml packages/cetz/files.json \
+	packages/cetz-plot/typst.toml packages/cetz-plot/files.json \
+	packages/oxifmt/typst.toml \
+	$(addprefix fonts/,$(TYPST_FONTS))
+
 DEPLOY_SSH := ssh -o ControlMaster=auto -o ControlPath=~/.ssh/ng-deploy-%C -o ControlPersist=120
-deploy: release
+# Refuse to ship a runtime the server cannot use.
+#
+# A missing runtime is a choice: no ./typst and PDF export is simply off. Half
+# a runtime is not. The directory is what decides whether the server offers the
+# feature at all, so an incomplete copy means the app advertises something it
+# cannot do — and the failure surfaces in someone's browser as a compiler
+# complaining about a path, which is a long way from the cause.
+#
+# This has now happened twice: once shipping a binary that draws with
+# matplotlib to a server with no matplotlib, once shipping one that draws with
+# CeTZ to a server with only mitex. Both times `make deploy` was happy to do it.
+check-runtime:
+	@fail=0; \
+	if [ -d pyodide ]; then \
+		for f in $(PYODIDE_FILES); do \
+			if [ ! -f pyodide/$$f ]; then echo "missing: pyodide/$$f"; fail=1; fi; \
+		done; \
+	else \
+		echo "note: no ./pyodide — snippets and Python figures will be unavailable"; \
+	fi; \
+	if [ -d typst ]; then \
+		for f in $(RUNTIME_TYPST); do \
+			if [ ! -f typst/$$f ]; then echo "missing: typst/$$f"; fail=1; fi; \
+		done; \
+	else \
+		echo "note: no ./typst — PDF export and CeTZ figures will be unavailable"; \
+	fi; \
+	if [ $$fail -ne 0 ]; then \
+		echo; \
+		echo "A runtime directory is here but incomplete, so the server would offer"; \
+		echo "a feature it cannot perform. Run \`make assets\` and deploy again."; \
+		exit 1; \
+	fi
+	@if [ -d typst ]; then $(PYTHON) scripts/package-manifest.py --check typst; fi
+	@echo "runtimes complete"
+
+deploy: check-runtime release
 	rsync -azv -e "$(DEPLOY_SSH)" dist/$(BINARY)-$(RELEASE_GOOS)-$(RELEASE_GOARCH) \
 		$(DEPLOY_HOST):$(DEPLOY_DIR)/$(BINARY)
 	@for dir in pyodide typst; do \
