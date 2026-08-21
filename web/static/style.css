@@ -8,6 +8,10 @@
 	--hover: #ececf1;
 	--text: #1c1c21;
 	--text-dim: #6b6b76;
+	/* the ink a drawing is inked in: whatever the typesetter left black.
+	   Full strength rather than --text, because a line one pixel wide has
+	   far less of itself to carry its contrast than a letter does. */
+	--figure-ink: #000000;
 	--accent: #4f46e5;
 	--accent-hover: #4338ca;
 	--accent-soft: #eef2ff;
@@ -31,6 +35,7 @@
 	--hover: #2a2a33;
 	--text: #e7e7ec;
 	--text-dim: #9c9ca8;
+	--figure-ink: #ffffff;
 	--accent: #818cf8;
 	--accent-hover: #a5b4fc;
 	--accent-soft: #27274a;
@@ -50,6 +55,7 @@
 		--hover: #2a2a33;
 		--text: #e7e7ec;
 		--text-dim: #9c9ca8;
+		--figure-ink: #ffffff;
 		--accent: #818cf8;
 		--accent-hover: #a5b4fc;
 		--accent-soft: #27274a;
@@ -898,6 +904,42 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
 	font-size: 0.76rem;
 	background: #0f172a;
 	color: #a5b4fc;
+}
+
+/* The figure in the mockup.
+ *
+ * It is a real drawing, produced by the same typesetter the app uses, and it
+ * carries no colour of its own: everything Typst drew in the default black
+ * was rewritten to currentColor, so the axes and labels take the theme's
+ * text colour while the curve keeps the one it was deliberately given.
+ *
+ * That is why it is inlined into the page rather than linked. An <img> is a
+ * document of its own and inherits nothing, and a CSS mask would paint the
+ * curve the same tone as the axes.
+ */
+/* Sized to sit inside the mockup rather than take it over: a figure at the
+   full width of the column dwarfs the note it is supposed to be part of. The
+   caption is bounded with it, so the two line up. */
+.shot-fig { margin: 1rem auto 0; max-width: 19rem; }
+.shot-fig-plot { color: var(--figure-ink); }
+.shot-fig-plot svg { display: block; width: 100%; height: auto; }
+.shot-fig figcaption {
+	display: flex;
+	align-items: baseline;
+	gap: 0.4rem;
+	margin-top: 0.35rem;
+	font-size: 0.78rem;
+	color: var(--text-dim);
+}
+.shot-fig-n { font-weight: 600; color: var(--text); }
+.shot-fig-src {
+	margin-left: auto;
+	font-family: var(--mono);
+	font-size: 0.7rem;
+	padding: 0.05rem 0.3rem;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	opacity: 0.7;
 }
 
 /* ---- feature lines (no boxes) ---- */

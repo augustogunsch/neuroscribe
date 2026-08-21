@@ -61,7 +61,16 @@ func newServer(db *sql.DB, pyodideDir, typstDir string, addr string) *server {
 	// Three server-rendered pages remain: the shell the app lives in, and the
 	// two that exist before there is an account to render anything for.
 	for _, page := range []string{"app.html", "login.html", "register.html", "landing.html"} {
-		s.pages[page] = template.Must(template.New("").Funcs(fm).ParseFS(assets, "templates/"+page))
+		files := []string{"templates/" + page}
+		// The landing page's figure is inlined rather than linked. It has to
+		// be part of this document to take its colour from it — an <img> is
+		// its own document and inherits nothing — and it cannot be a mask,
+		// which would flatten the one deliberate colour in it to the same
+		// tone as the axes. Drawn by scripts/make-landing-figure.html.
+		if page == "landing.html" {
+			files = append(files, "static/generated/landing-figure.svg")
+		}
+		s.pages[page] = template.Must(template.New("").Funcs(fm).ParseFS(assets, files...))
 	}
 
 	m := s.mux

@@ -27,11 +27,46 @@ It needs ./static (a link to web/static), ./typst and ./pyodide beside it:
 
     ln -sfn web/static static
 """
+import os
 import sys
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
+# Where a generator page is allowed to write. Only here: this server runs with
+# the whole repository under it, and a page that can PUT anywhere is a page
+# that can rewrite the code it is testing.
+WRITABLE = "web/static/generated/"
+
 
 class Handler(SimpleHTTPRequestHandler):
+    def do_PUT(self):
+        """Let a generator page save what it produced.
+
+        scripts/make-landing-figure.html draws a figure with the real
+        typesetter and needs the result on disk. The alternative is copying
+        twenty kilobytes of path data out of a browser by hand.
+        """
+        path = self.path.lstrip("/").split("?")[0]
+        if not path.startswith(WRITABLE) or ".." in path:
+            self.send_error(403, f"only {WRITABLE} is writable")
+            return
+        try:
+            body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        except (TypeError, ValueError):
+            self.send_error(400, "no length")
+            return
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as f:
+            f.write(body)
+        self.send_response(204)
+        self.end_headers()
+        sys.stderr.write(f"wrote {path} ({len(body)} bytes)\n")
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Methods", "GET, PUT, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
+
     def end_headers(self):
         # what runner.go sends, for the same reason: the frame that runs
         # snippets is sandboxed, and sandboxed means a different origin

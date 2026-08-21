@@ -583,3 +583,66 @@ func TestTheDocumentedExamplesAreKeptRunnable(t *testing.T) {
 		t.Error("the harness still tells people to use a plain file server")
 	}
 }
+
+// The landing page shows a real figure, and shows it the way the app does.
+//
+// It is the feature's only advertisement, so it has to be a drawing this
+// typesetter actually produced rather than a picture of one — and it has to
+// cost a visitor nothing, which rules out loading thirty megabytes of
+// typesetter on a page whose job is to explain the app.
+//
+// Inlined rather than linked, because that is what lets it take the page's
+// colour: an <img> is a document of its own and inherits nothing.
+func TestTheLandingPageShowsARealFigure(t *testing.T) {
+	svg := string(repoFile(t, "web/static/generated/landing-figure.svg"))
+	if !strings.Contains(svg, "<svg") {
+		t.Fatal("the landing figure is not an SVG")
+	}
+	// Typst writes its default colour as an explicit #000; the generator
+	// rewrites exactly those so the axes follow the theme. Anything drawn in a
+	// deliberate colour has to survive that, or the curve goes the same tone
+	// as the axes it is drawn against.
+	if !strings.Contains(svg, "currentColor") {
+		t.Error("the figure carries a fixed colour; it cannot follow the theme")
+	}
+	if strings.Contains(svg, `"#000"`) {
+		t.Error("some of the figure is still hard-black and will vanish in dark mode")
+	}
+	if !strings.Contains(svg, "#0074d9") {
+		t.Error("the plotted curve lost its colour; it is now indistinguishable from the axes")
+	}
+
+	page := string(repoFile(t, "web/templates/landing.html"))
+	if !strings.Contains(page, `{{template "landing-figure.svg"}}`) {
+		t.Error("the figure is no longer inlined, so it cannot inherit the page's colour")
+	}
+	// Parsed alongside the page, or that template action fails at startup.
+	server := string(repoFile(t, "internal/app/server.go"))
+	if !strings.Contains(server, `"static/generated/landing-figure.svg"`) {
+		t.Error("the figure is not parsed with the landing page; rendering it would panic")
+	}
+
+	css := string(repoFile(t, "web/static/style.css"))
+	// Its own token rather than --text: a one-pixel line has far less of
+	// itself to carry contrast than a letter does, so the ink goes to full
+	// strength — pure white on dark, pure black on light.
+	if !strings.Contains(css, ".shot-fig-plot { color: var(--figure-ink); }") {
+		t.Error("the figure is no longer inked with the theme's figure colour")
+	}
+	for _, want := range []string{"--figure-ink: #000000;", "--figure-ink: #ffffff;"} {
+		if !strings.Contains(css, want) {
+			t.Errorf("%s is not defined; one theme has no ink", want)
+		}
+	}
+	// Both dark paths: the explicit choice and the automatic one.
+	if n := strings.Count(css, "--figure-ink: #ffffff;"); n != 2 {
+		t.Errorf("dark ink is defined %d times; it needs both [data-theme=dark] "+
+			"and the prefers-color-scheme block", n)
+	}
+
+	// And the generator that made it is kept, so it can be redrawn.
+	gen := string(repoFile(t, "scripts/make-landing-figure.html"))
+	if !strings.Contains(gen, "landing-figure.svg") {
+		t.Error("the figure can no longer be regenerated")
+	}
+}

@@ -1,0 +1,91 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>landing figure</title>
+<!--
+  Draws the figure shown in the landing page's mockup, with the real
+  typesetter, and saves it to web/static/generated/landing-figure.svg.
+
+  It is generated rather than drawn by hand because it should be a real
+  figure — the feature it advertises, produced by the code that produces
+  every other one — and generated once rather than on the visitor's machine,
+  because a landing page must not fetch thirty megabytes of typesetter to
+  show a picture of a sine wave.
+
+      python3 scripts/harness-serve.py
+      open http://127.0.0.1:8791/scripts/make-landing-figure.html
+
+  The page needs the server's PUT route to write the result; a plain file
+  server will render the preview and save nothing.
+-->
+<style>
+  body { background: #14161a; color: #e6e8ec; font: 14px/1.5 system-ui; padding: 2rem; }
+  .box { background: #1b1e24; padding: 1.25rem; border-radius: 10px; max-width: 30rem; }
+  svg { width: 100%; height: auto; color: #e6e8ec; }
+  .light { background: #fbfbfd; color: #1a1c20; margin-top: 1rem; }
+  b { font-weight: 600; }
+</style>
+<h1>landing figure</h1>
+<p id="status">drawing…</p>
+<div class="box" id="dark"></div>
+<div class="box light" id="light"></div>
+
+<script>
+// Small, and legible at the size a mockup shows it: crossed axes with arrows,
+// no tick numbers — at thumbnail scale the numerals would be noise, and each
+// glyph is an outline that costs more than the curve does.
+const SOURCE = `#import "/cetz/src/lib.typ" as cetz: draw, canvas
+#import "/cetz-plot/src/lib.typ": plot, chart
+
+#set page(width: auto, height: auto, margin: 2pt, fill: none)
+#set text(font: "New Computer Modern", size: 9pt)
+
+#{
+canvas(length: .8cm, {
+  plot.plot(size: (7, 3.6), axis-style: "school-book",
+            x-tick-step: none, y-tick-step: none, y-min: -1.1, y-max: 1.1, {
+    plot.add(domain: (0, 12), samples: 140, x => calc.exp(-x/4) * calc.sin(2*x))
+    plot.add(domain: (0, 12), samples: 60, style: (stroke: (dash: "dashed")),
+             x => calc.exp(-x/4))
+  })
+})
+}`;
+
+/* Inline in the page rather than in an <img>, which is what makes it follow
+ * the theme: an <img> is its own document and inherits nothing, but inline SVG
+ * is part of this one, so "currentColor" resolves to whatever the surrounding
+ * CSS says. Typst writes the default colour as an explicit #000, so swapping
+ * exactly that leaves anything drawn in a deliberate colour alone. */
+function themed(svg) {
+  return svg.replace(/(stroke|fill)="#000"/g, '$1="currentColor"')
+    // it is decoration beside a real explanation, not content
+    .replace(/^<svg /, '<svg aria-hidden="true" focusable="false" ');
+}
+
+const w = new Worker("/static/typst-worker.js", { type: "module" });
+const pending = new Map();
+let n = 0;
+w.onmessage = (e) => { const p = pending.get(e.data.id); if (p) { pending.delete(e.data.id); p(e.data); } };
+const send = (source) => { const id = ++n; return new Promise(r => { pending.set(id, r); w.postMessage({ id, source, files: {}, want: "svg" }); }); };
+
+(async () => {
+  const status = document.getElementById("status");
+  const r = await send(SOURCE);
+  if (r.error) { status.textContent = "failed: " + r.error; return; }
+
+  const svg = themed(r.svg);
+  document.getElementById("dark").innerHTML = svg;
+  document.getElementById("light").innerHTML = svg;
+
+  const swapped = (r.svg.match(/#000/g) || []).length;
+  const resp = await fetch("/web/static/generated/landing-figure.svg", {
+    method: "PUT",
+    headers: { "Content-Type": "image/svg+xml" },
+    body: svg,
+  });
+  status.innerHTML = "<b>" + (svg.length / 1024).toFixed(1) + " kB</b>, " + swapped +
+    " default-black references now follow the theme — " +
+    (resp.ok ? "saved to web/static/generated/landing-figure.svg"
+             : "NOT saved (" + resp.status + "): is this harness-serve.py?");
+  document.title = "done";
+})();
+</script>
