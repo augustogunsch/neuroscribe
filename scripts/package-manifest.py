@@ -34,7 +34,13 @@ REGISTRY_IMPORT = re.compile(r'"@preview/([a-z0-9-]+):[0-9.]+"')
 # A package may also import from its own root: `#import "/src/vector.typ"`.
 # Inside a real package that "/" is the package; here every package shares one
 # filesystem, so it has to be made relative to where this one is mounted.
-ROOT_IMPORT = re.compile(r'(#(?:import|include)\s+)"(/[^"]*)"')
+#
+# The "#" is optional, and that is the whole subtlety. In markup an import is
+# written "#import"; inside a code block it is a bare "import". The bare ones
+# sit in function bodies, so they resolve when the function is *called* rather
+# than when the file is read — which is why missing them looked like a working
+# package right up until something was actually drawn with it.
+ROOT_IMPORT = re.compile(r'((?:#\s*)?\b(?:import|include)\s+)"(/[^"]*)"')
 
 
 def rewrite(path, pkg):

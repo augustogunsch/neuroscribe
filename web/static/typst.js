@@ -79,7 +79,25 @@ const NG_CETZ_PREAMBLE = `#import "/cetz/src/lib.typ" as cetz: draw, canvas
 // carry are comments in Typst too, so the source stays something you could
 // paste into a .typ file.
 async function ngCetzFigure(code) {
-	return ngTypstSend(NG_CETZ_PREAMBLE + String(code || ""), {}, "svg");
+	return ngTypstSend(NG_CETZ_PREAMBLE + ngCetzBody(code), {}, "svg");
+}
+
+/* A fence is written as an expression — canvas({ … }) — not as Typst markup,
+ * because that is what a drawing is. Markup mode would take it for prose and
+ * typeset the source instead of running it, which fails silently: you get a
+ * figure, it is just a picture of your own code. So the body is put into code
+ * mode explicitly, and the directives are left where they are, being comments.
+ */
+function ngCetzBody(code) {
+	const lines = String(code || "").split("\n");
+	let at = 0;
+	while (at < lines.length && (!lines[at].trim() || /^\s*(?:#|\/\/)\s*:/.test(lines[at]))) at++;
+	const head = lines.slice(0, at).join("\n");
+	const body = lines.slice(at).join("\n").trim();
+	if (!body) return head;
+	// already in code mode
+	if (body.charAt(0) === "#") return head + "\n" + body;
+	return head + "\n#{\n" + body + "\n}";
 }
 
 /* ---- emitting Typst source ---- */
@@ -255,6 +273,19 @@ function ngTypstRenderer(ctx) {
 				// picture is what the note shows and the code is folded away
 				// there, so printing the source here would put in the document
 				// the one thing the reader chose to hide.
+				// A CeTZ fence is Typst: it goes into the document as source and
+				// is typeset with everything around it. No image, no embedding,
+				// no second rendering that has to agree with the first — the
+				// figure in the PDF is drawn by the compiler building the PDF.
+				if (String(t.lang || "").trim().split(/\s+/)[0] === "plot") {
+					const meta = ngPlotMeta(t.text);
+					// already inside a code block, so the body goes in as written
+					out.push("#figure(\n  {" + t.text + "\n  }" +
+						(meta.caption ? ",\n  caption: [" + ngTypstProse(meta.caption, ctx.figures) + "]" : "") +
+						"\n)" + (meta.label ? " <" + ngFigureLabel(meta.label) + ">" : "") + "\n");
+					return;
+				}
+
 				const drawn = ctx.plots[t.text];
 				if (drawn && drawn.length) {
 					const meta = ngPlotMeta(t.text);
@@ -355,6 +386,8 @@ function ngMarkdownToTypst(src, ctx) {
 /* ---- the document ---- */
 
 const NG_TYPST_PREAMBLE = `#import "/mitex/lib.typ": mi, mitex
+#import "/cetz/src/lib.typ" as cetz: draw, canvas
+#import "/cetz-plot/src/lib.typ": plot, chart
 
 #set page(paper: "a4", margin: 2.7cm, numbering: "1")
 #set text(font: "New Computer Modern", size: 11pt)
@@ -494,6 +527,22 @@ function ngPlotLabels(note, plots) {
 		const meta = ngPlotMeta(code);
 		if (meta.label) labels[meta.label] = true;
 	});
+	// CeTZ fences never go through ngCollectPlots — nothing draws them ahead of
+	// time, the compiler does it in place — so their labels are read here.
+	for (const chapter of note.chapters || []) {
+		let tokens;
+		try {
+			tokens = marked.lexer(String(chapter.content || ""), { gfm: true });
+		} catch (err) {
+			continue;
+		}
+		for (const t of tokens) {
+			if (t.type !== "code") continue;
+			if (String(t.lang || "").trim().split(/\s+/)[0] !== "plot") continue;
+			const meta = ngPlotMeta(t.text);
+			if (meta.label) labels[meta.label] = true;
+		}
+	}
 	return labels;
 }
 

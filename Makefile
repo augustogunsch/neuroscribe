@@ -99,7 +99,7 @@ MITEX_VERSION  := 0.2.5
 # are what lets a figure be typeset by the same compiler that typesets the
 # document around it — so a plot in a note and the same plot in the PDF are not
 # two renderings that agree, they are one rendering.
-CETZ_VERSION   := 0.3.4
+CETZ_VERSION   := 0.3.2
 CETZPLOT_VERSION := 0.1.1
 # CeTZ imports this one for string formatting. Fetched because the compiler has
 # no package registry and is never allowed to reach for one — see
