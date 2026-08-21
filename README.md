@@ -229,30 +229,56 @@ is SQLite on the server (`modernc.org/sqlite`, pure Go — no cgo) and IndexedDB
 in the browser. Templates and static assets are embedded in the binary.
 
 ```
-main.go       entrypoint
-handlers.go   routing, security headers, CSRF
-shell.go      the one page every app address returns, plus /account
-sync.go       the sync API: pull, push, blobs — all the server does with notes
-db.go         SQLite: accounts, sessions, and one opaque record store
-auth.go       sign-in, sessions
-register.go   public sign-up, email confirmation
-altcha.go     proof-of-work captcha challenges
-mail.go       SMTP delivery
-runner.go     serves the browser's Python runtime and typesetter
-templates/    the shell, and the pages that exist before an account does
+cmd/neuroscribe/   six lines: a call into internal/app
 
-static/
-  sw.js        service worker: caches the shell, answers every navigation
-  store.js     IndexedDB — the source of truth
-  sync.js      pushes what is dirty, pulls what is new, resolves conflicts
-  model.js     the decrypted shape of the account, in memory only
-  views.js     the pages (was templates/)
-  router.js    addresses, dialogs, images, global actions
-  settings.js  settings, note types, offline runtime switches
-  render.js    Markdown → sanitised DOM → KaTeX
-  crypto.js    key derivation, sealing, opening
-  lock.js      the PIN lock
-  export.js    zip and PDF, both built from this device's copy
+internal/app/
+  run.go           startup, subcommands, configuration
+  server.go        the struct, and every address the app answers
+  middleware.go    what each request passes through, in a deliberate order
+  render.go        templates, JSON, errors, flashes
+  shell.go         the one page every app address returns, plus /account
+  auth.go          sign-in, sessions
+  password.go      the three routes that make you prove your password
+  register.go      public sign-up, email confirmation
+  security.go      allowed hosts and origins, CSRF, the login throttle
+  sync.go          the sync API: pull, push, blobs — all the server does with notes
+  db.go            SQLite: accounts, sessions, and one opaque record store
+  plan.go          quotas, the one thing the server judges about what it cannot read
+  altcha.go        proof-of-work captcha challenges
+  mail.go          SMTP delivery
+  runner.go        serves the browser's Python runtime and typesetter
+  bundle.go        freezes the frontend for the Android app
+  download.go      hands out the APK
+  highlight.go     the syntax-highlighting stylesheet
+  i18n.go          the machinery; i18n_pt_br.go is the table
+
+web/               the frontend, and the embed that hands it to the server
+  templates/       the shell, and the pages that exist before an account does
+  static/
+    sw.js          service worker: caches the shell, answers every navigation
+    store.js       IndexedDB — the source of truth
+    sync.js        pushes what is dirty, pulls what is new, resolves conflicts
+    model.js       the decrypted shape of the account, in memory only
+    views.js       the pages
+    router.js      addresses, dialogs, images, global actions
+    app.js         the frame: sidebar, drag and drop, shortcuts, sync status
+    settings.js    the settings page; types.js is the note-types page
+    prefs.js       language and colour scheme
+    render.js      Markdown → sanitised DOM → KaTeX
+    crypto.js      key derivation, sealing, opening
+    csrf.js        the token, read from the cookie
+    pin.js         the PIN: device identity, the synced record, proving it
+    lock.js        what locking does to this tab
+    editor.js      the Markdown toolbar
+    run.js         snippets, in a sandboxed frame
+    typst.js       Markdown → Typst → PDF, typeset in the browser
+    export.js      zip and PDF, both built from this device's copy
+    boot.js        runs before first paint: theme, sidebar, the worker
+
+android/           the app that carries a frozen copy of web/
+deploy/            nginx configuration
+docs/              deployment and Android guides
+scripts/           fetch.sh, which installs nothing unpinned
 ```
 
 ## How offline works
