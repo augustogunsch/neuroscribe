@@ -278,7 +278,14 @@ async function ngViewIndex() {
 		}))
 		: ngEl("p", { class: "page-hint", text: ngT("No notes yet. Use + Note to write the first one.") });
 
-	host.replaceChildren(hero, ngEl("h2", { class: "toc-title", text: ngT("Recent") }), recent);
+	// One column, one measure. The hero and the list are separate elements but
+	// the same page, and bounding only the prose left the list running to the
+	// full width of the content area beside text that stopped well short of it.
+	host.replaceChildren(ngEl("div", { class: "index" }, [
+		hero,
+		ngEl("h2", { class: "toc-title", text: ngT("Recent") }),
+		recent,
+	]));
 	ngSetTitle("");
 }
 

@@ -296,7 +296,11 @@ body.resizing { user-select: none; cursor: col-resize; }
 	margin: 0 auto;
 }
 
-.hero { max-width: 38rem; margin-top: 3rem; }
+/* The index is one column at one width: the intro, the instructions and the
+   list of recent notes all measure the same. The width lives here rather than
+   on .hero, so nothing inside can disagree with the rest of the page. */
+.index { max-width: 38rem; }
+.hero { margin-top: 3rem; }
 .hero h1 { font-size: 2.2rem; margin-bottom: 0.2rem; }
 .tagline { color: var(--text-dim); font-size: 1.1rem; margin-top: 0; }
 .hints { padding-left: 1.2rem; }

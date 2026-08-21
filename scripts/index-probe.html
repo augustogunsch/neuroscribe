@@ -1,0 +1,90 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>index probe</title>
+<!--
+  Measures the index page, which is the app's manual and its front door.
+
+  Layout is the one thing the Go tests cannot see: they read these files
+  without laying them out, so "the list of recent notes is wider than the text
+  beside it" is invisible to them and obvious to anyone looking at the page.
+
+      python3 scripts/harness-serve.py
+      open http://127.0.0.1:8791/scripts/index-probe.html
+
+  Everything is compared against the prose, not against the column: in the
+  broken state the column is as wide as the widest thing inside it, so an
+  assertion against the column passes while the page is visibly wrong.
+-->
+<link rel="stylesheet" href="/static/style.css">
+<pre id="out" style="padding:1rem">running…</pre>
+
+<!-- the shell the index is rendered into, as app.html builds it -->
+<main class="content" data-view></main>
+
+<script>
+function ngTF(f) { const a = [...arguments].slice(1); let i = 0; return ngT(f).replace(/%s|%d/g, () => a[i++]); }
+function ngPref(k, d) { return d; }
+function ngToast() {}
+</script>
+<script src="/static/strings.js"></script>
+<script src="/static/run.js"></script>
+<script src="/static/views.js"></script>
+<script>
+const out = document.getElementById("out");
+const log = (s) => { out.textContent += s + "\n"; };
+const ok = (c, w) => log((c ? "ok   " : "FAIL ") + w);
+
+// Enough of a model for the index to render.
+window.ngModel = {
+  notes: [
+    { ref: "a", title: "Quantum Mechanics", updated_at: "2026-08-20T10:00:00Z", trashed: false },
+    { ref: "b", title: "Álgebra Linear", updated_at: "2026-08-19T10:00:00Z", trashed: false },
+    { ref: "c", title: "Waves and a rather long note title to push the width", updated_at: "2026-08-18T10:00:00Z", trashed: false },
+  ],
+};
+window.ngSetTitle = function () {};
+
+(async () => {
+  out.textContent = "";
+  document.documentElement.setAttribute("data-theme", "dark");
+  document.body.dataset.runner = "1";
+  document.body.dataset.typst = "1";
+
+  await ngViewIndex();
+
+  const w = (sel) => {
+    const el = document.querySelector(sel);
+    return el ? Math.round(el.getBoundingClientRect().width) : null;
+  };
+
+  const column = w(".index");
+  const hero = w(".hero");
+  const hints = w(".hints");
+  const heading = w(".toc-title");
+  const list = w(".chapter-list");
+  const help = w(".plot-help");
+  const content = w(".content");
+
+  log("content area : " + content);
+  log("index column : " + column);
+  log("  hero       : " + hero);
+  log("  hints      : " + hints);
+  log("  Recent h2  : " + heading);
+  log("  note list  : " + list);
+  log("  plot help  : " + help);
+  log("");
+
+  // Everything is measured against the prose, because the prose is what sets
+  // the measure — asserting against the column instead passes in the broken
+  // state, where the column is as wide as the widest thing in it.
+  ok(hints !== null, "the index rendered");
+  ok(list === hints, "the note list is the width of the text (" + list + " vs " + hints + ")");
+  ok(heading === hints, "the Recent heading is too (" + heading + " vs " + hints + ")");
+  ok(hero === hints, "and the intro (" + hero + " vs " + hints + ")");
+  if (help !== null) ok(help <= hints, "the plot help stays within it (" + help + ")");
+  ok(hints < content, "the text is narrower than the content area (" + hints + " < " + content + ")");
+
+  log("DONE");
+  document.title = "done";
+})().catch(e => log("BROKE: " + (e && e.stack || e)));
+</script>

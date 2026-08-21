@@ -206,3 +206,42 @@ func TestCSRFTokenIsReadFromTheCookie(t *testing.T) {
 		t.Error("csrf.js no longer reads the token from the cookie")
 	}
 }
+
+// The index is one column at one width.
+//
+// It is the app's manual and its front door, and it is assembled from parts —
+// an intro, a list of instructions, a copyable example, a list of recent notes
+// — that have no reason to agree about width unless something makes them. When
+// only the prose was bounded, the note list ran to the full width of the
+// content area beside text that stopped well short of it.
+//
+// Layout is what these tests cannot see: they read the source without laying it
+// out. So this checks the structure that produces the layout, and
+// scripts/index-probe.html measures the result.
+func TestTheIndexIsOneColumn(t *testing.T) {
+	views := readAsset(t, "static/views.js")
+	if !strings.Contains(views, `ngEl("div", { class: "index" }`) {
+		t.Fatal("the index is no longer wrapped in a single column")
+	}
+	// Everything the view renders goes inside it, or the part left out is the
+	// part that looks wrong.
+	at := strings.Index(views, `host.replaceChildren(ngEl("div", { class: "index" }`)
+	if at < 0 {
+		t.Fatal("the column is built but not what the view renders")
+	}
+	for _, part := range []string{"hero", "toc-title", "recent"} {
+		if !strings.Contains(views[at:at+400], part) {
+			t.Errorf("%q is not inside the column", part)
+		}
+	}
+
+	css := string(repoFile(t, "web/static/style.css"))
+	if !strings.Contains(css, ".index { max-width:") {
+		t.Error("the column has no width, so its contents each take their own")
+	}
+	// One source for the measure. Two elements carrying their own max-width is
+	// how they came to disagree in the first place.
+	if strings.Contains(css, ".hero { max-width:") {
+		t.Error(".hero sets its own width again; the column's width is the only one")
+	}
+}
