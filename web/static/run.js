@@ -575,13 +575,92 @@ function ngLinkPlotRefs(root, labels) {
 	});
 }
 
+/* ---- inking a figure for the theme ----
+ *
+ * A drawing arrives black on nothing. That is right for paper and wrong for a
+ * dark page, where black line art on a dark ground is very nearly not there —
+ * and this app opens in dark by default, so it was the common case.
+ *
+ * The figure cannot be told to follow the page. It is shown through an <img>,
+ * which the sanitizer requires — an SVG placed as markup is the mutation-XSS
+ * hole this app refuses to open — and an <img> is a document of its own that
+ * inherits no colour and sees no theme.
+ *
+ * So the colour is put in before it is shown. Both engines write their default
+ * black as an explicit value and everything chosen deliberately as some other
+ * one: CeTZ writes "#000", matplotlib "#000000", and a curve you asked to be
+ * red is "#cb1b45" either way. Rewriting exactly the default leaves every
+ * deliberate colour untouched, which is why this is a swap and not a filter.
+ *
+ * It happens at the moment of display and not where the drawing is made: the
+ * SVG that goes into a PDF is the same SVG, and a document is black on white
+ * whatever the screen it was exported from.
+ */
+
+// #000 and #000000, and neither #0001 nor #000fff.
+const NG_DEFAULT_INK = /#000(?:000)?(?![0-9a-fA-F])/g;
+
+function ngFigureInk() {
+	const set = getComputedStyle(document.documentElement)
+		.getPropertyValue("--figure-ink").trim();
+	return set || "#000000";
+}
+
+function ngInk(svg, ink) {
+	return ink && ink !== "#000000" ? String(svg).replace(NG_DEFAULT_INK, ink) : String(svg);
+}
+
+/* The drawing as the engine produced it, per image.
+ *
+ * A WeakMap rather than a data attribute: a figure is tens of kilobytes of
+ * path data, it has no business in the DOM twice, and this way it is released
+ * with the image rather than outliving it.
+ */
+const ngFigureSource = new WeakMap();
+
+/* Re-ink what is already on screen when the theme changes.
+ *
+ * Nothing is drawn again — no engine, no network. The stored SVG is
+ * re-coloured and a new object URL replaces the old, which is why this is
+ * instant even for a note full of figures.
+ */
+function ngReinkFigures(root) {
+	const ink = ngFigureInk();
+	(root || document).querySelectorAll("img.run-figure").forEach(function (img) {
+		const svg = ngFigureSource.get(img);
+		if (!svg) return;
+		const old = img.src;
+		img.src = ngFigureURL(ngInk(svg, ink));
+		if (old.indexOf("blob:") === 0) URL.revokeObjectURL(old);
+	});
+}
+
+// The theme is an attribute on the document, set by the picker in settings and
+// again at boot. Watching it is simpler than finding every place it can change,
+// and it cannot be forgotten by a later one.
+function ngWatchTheme() {
+	if (!window.MutationObserver || !document.documentElement) return;
+	new MutationObserver(function () { ngReinkFigures(document); })
+		.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+	// "auto" follows the system, which can change while the page is open
+	if (window.matchMedia) {
+		const dark = window.matchMedia("(prefers-color-scheme: dark)");
+		const onChange = function () { ngReinkFigures(document); };
+		if (dark.addEventListener) dark.addEventListener("change", onChange);
+		else if (dark.addListener) dark.addListener(onChange);
+	}
+}
+
 function ngFigureElements(figures) {
 	if (!figures || !figures.length) return [];
+	const ink = ngFigureInk();
 	return figures.map(function (svg) {
 		var img = document.createElement("img");
 		img.className = "run-figure";
 		img.alt = ngT("Figure");
-		img.src = ngFigureURL(svg);
+		// kept as drawn, so a theme change can re-ink it without redrawing
+		ngFigureSource.set(img, svg);
+		img.src = ngFigureURL(ngInk(svg, ink));
 		// the object URL is this document's to keep; releasing it on unload is
 		// enough, and releasing it earlier would blank an image still on screen
 		img.addEventListener("load", function () { img.dataset.ready = "1"; });

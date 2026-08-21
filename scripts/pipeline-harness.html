@@ -31,6 +31,11 @@
 -->
 
 <link rel="stylesheet" href="/static/vendor/katex.min.css">
+<style>
+  /* the two the app defines; ngFigureInk reads whichever the theme selects */
+  :root { --figure-ink: #000000; }
+  :root[data-theme="dark"] { --figure-ink: #ffffff; }
+</style>
 <pre id="out">loading…</pre>
 <div id="note" style="display:none"></div>
 
@@ -264,6 +269,59 @@ canvas({
     log("pdf    : a duplicated label builds (" + (pdf ? pdf.length : 0) + " bytes)");
   } catch (err) {
     log("pdf    : a duplicated label FAILS — " + (err && err.message || err));
+  }
+
+  // ---- 8. a figure takes the page's colour, and only where it should ----
+  //
+  // Black line art on a dark page is very nearly not there, and this app opens
+  // in dark. The figure cannot follow the page on its own: it is shown through
+  // an <img>, which is a document of its own that inherits nothing. So the
+  // default black is swapped for the theme's ink at the moment of display —
+  // and only there, because the PDF gets the same SVG and a document is black
+  // on white whatever screen it came from.
+  document.documentElement.setAttribute("data-theme", "dark");
+  if (typeof ngWatchTheme === "function") ngWatchTheme();
+
+  const cetzRaw = await ngCetzFigure(`canvas({
+    plot.plot(size: (6,4), x-tick-step: 2, { plot.add(domain: (0,6), x => calc.sin(x)) })
+  })`);
+  const mplRaw = await ngPlotFigures("python", `import numpy as np, matplotlib.pyplot as plt
+x = np.linspace(0, 6, 100)
+fig, ax = plt.subplots(figsize=(4, 2.4))
+ax.plot(x, np.sin(x), color="red")
+ax.set_xlabel("x")`, () => {});
+
+  const many = (s, re) => (String(s).match(re) || []).length;
+  const mpl = Array.isArray(mplRaw) ? mplRaw[0] : null;
+  ok(!!mpl, "matplotlib drew for the ink checks");
+
+  if (mpl) {
+    // what the engines produced is untouched — this is what a PDF embeds
+    ok(many(cetzRaw, /#000(?![0-9a-f])/gi) > 0, "the CeTZ drawing itself is still default-black");
+    ok(many(mpl, /#000000(?![0-9a-f])/gi) > 0, "the matplotlib drawing itself is still default-black");
+    // and no white card cut out of the page behind it
+    ok(many(mpl, /#ffffff/gi) === 0, "matplotlib saves no background of its own");
+
+    const stage = document.createElement("div");
+    document.body.appendChild(stage);
+    stage.replaceChildren(...ngFigureElements([cetzRaw, mpl]));
+    const imgs = [...stage.querySelectorAll("img.run-figure")];
+    const shown = async (img) => await (await fetch(img.src)).text();
+
+    let a = await shown(imgs[0]), b = await shown(imgs[1]);
+    ok(many(a, /#ffffff/gi) > 0 && many(a, /#000(?![0-9a-f])/gi) === 0,
+       "on a dark page the CeTZ figure is inked white");
+    ok(many(b, /#ffffff/gi) > 0 && many(b, /#000000(?![0-9a-f])/gi) === 0,
+       "on a dark page the matplotlib figure is inked white");
+    ok(many(b, /#ff0000|"red"|:red/gi) > 0, "a deliberately red curve survives the swap");
+
+    const was = imgs[0].src;
+    document.documentElement.setAttribute("data-theme", "light");
+    await new Promise(r => setTimeout(r, 150));
+    a = await shown(imgs[0]); b = await shown(imgs[1]);
+    ok(imgs[0].src !== was, "changing the theme re-inks in place, with no redraw");
+    ok(many(a, /#000(?![0-9a-f])/gi) > 0, "on a light page the CeTZ figure is black again");
+    ok(many(b, /#000000(?![0-9a-f])/gi) > 0, "on a light page the matplotlib figure is black again");
   }
 
   log("DONE");

@@ -646,3 +646,64 @@ func TestTheLandingPageShowsARealFigure(t *testing.T) {
 		t.Error("the figure can no longer be regenerated")
 	}
 }
+
+// A figure takes the reader's colour, and only on screen.
+//
+// A drawing arrives black on nothing, which is right for paper and wrong for a
+// dark page — and this app opens in dark, so it was the ordinary case: line
+// art the same value as the ground it sits on. It cannot be told to follow the
+// page either, because it is shown through an <img>, which the sanitizer
+// requires and which inherits nothing.
+//
+// So the default black is swapped at the moment of display. Both engines write
+// theirs explicitly and everything deliberate as some other value, which is
+// what makes a swap possible where a filter would wreck a colormap.
+func TestAFigureIsInkedForTheThemeItIsReadIn(t *testing.T) {
+	run := readAsset(t, "static/run.js")
+
+	if !strings.Contains(run, "function ngInk") || !strings.Contains(run, "NG_DEFAULT_INK") {
+		t.Fatal("figures are no longer inked, so they are black on a dark page")
+	}
+	// #000 and #000000, and neither #0001 nor #000fff — a looser pattern
+	// would eat the leading digits of a deliberate colour.
+	if !strings.Contains(run, `/#000(?:000)?(?![0-9a-fA-F])/g`) {
+		t.Error("the black pattern changed; it may now match deliberate colours")
+	}
+	if !strings.Contains(run, `getPropertyValue("--figure-ink")`) {
+		t.Error("the ink no longer comes from the theme")
+	}
+	// Inked where it is shown, not where it is made: the PDF embeds the same
+	// SVG and a document is black on white whatever screen it came from.
+	// Both places a source becomes an image: when it is first placed, and
+	// when the theme changes under it. Checking one passes while the other is
+	// broken, which is how the first version of this assertion behaved.
+	if n := strings.Count(run, "ngFigureURL(ngInk(svg, ink))"); n != 2 {
+		t.Errorf("%d of 2 places ink the figure; one path shows it uncoloured", n)
+	}
+	typst := readAsset(t, "static/typst.js")
+	if strings.Contains(typst, "ngInk(") {
+		t.Error("the PDF builder inks its figures; an exported document would " +
+			"carry the screen's colours")
+	}
+
+	// A theme change re-inks rather than redrawing — the engine is expensive
+	// and the drawing has not changed.
+	if !strings.Contains(run, "function ngReinkFigures") ||
+		!strings.Contains(run, "ngFigureSource") {
+		t.Error("a theme change can no longer re-ink what is already drawn")
+	}
+	if !strings.Contains(run, `attributeFilter: ["data-theme"]`) {
+		t.Error("nothing watches the theme, so figures keep the colour they were drawn in")
+	}
+	if !strings.Contains(readAsset(t, "static/router.js"), "ngWatchTheme()") {
+		t.Error("the theme watcher is never started")
+	}
+
+	// And matplotlib must not paint a background: transparent is the one thing
+	// a swap cannot fix afterwards, since "no background" is the absence of a
+	// colour rather than one to replace.
+	runner := readAsset(t, "static/runner.js")
+	if !strings.Contains(runner, "transparent=True") {
+		t.Error("matplotlib saves an opaque figure; it would be a white card on a dark page")
+	}
+}

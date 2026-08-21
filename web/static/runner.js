@@ -78,7 +78,12 @@ if _ng_plt is not None:
     _ng_plt.rcParams["svg.fonttype"] = "path"
     for _ng_n in _ng_plt.get_fignums():
         _ng_buf = _ng_io.StringIO()
-        _ng_plt.figure(_ng_n).savefig(_ng_buf, format="svg", bbox_inches="tight")
+        # transparent, so the figure sits on the page rather than on a white
+        # card cut out of it. The ink is recoloured for the theme once the SVG
+        # is on the page; the background cannot be, because "no background" is
+        # the absence of a colour rather than one to swap.
+        _ng_plt.figure(_ng_n).savefig(_ng_buf, format="svg", bbox_inches="tight",
+                                      transparent=True)
         _ng_figs.append(_ng_buf.getvalue())
     _ng_plt.close("all")
 _ng_figs

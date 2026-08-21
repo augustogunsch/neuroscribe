@@ -580,6 +580,19 @@ snippets (`python plot`), and neither is fetched on a device that does neither.
 - **A figure is shown as an image, never as inline markup** — see *Security*.
 - **A 3D surface is a large picture.** The 40×40 mesh above is well over
   100 KB of SVG; halve the resolution if a note carries many of them.
+- **Figures follow the theme, and you write nothing to make them.** Whatever an
+  engine leaves in its default black is drawn in the reader's ink — white on a
+  dark page, black on a light one — and the background is transparent either
+  way. Anything you colour deliberately keeps that colour, so a `color="red"`
+  curve or a viridis surface looks the same in both. Switching the theme
+  re-inks what is on screen without redrawing it.
+
+  Two consequences worth knowing. A line you deliberately draw in black is
+  indistinguishable from one left at the default, so it is re-inked too — which
+  is what you want on a dark page anyway. And the **PDF is not affected**: an
+  exported document is black on white whatever the screen it was exported from,
+  because the ink is applied where the figure is displayed rather than where it
+  is drawn.
 
 ## How offline works
 
