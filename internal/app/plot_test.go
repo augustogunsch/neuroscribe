@@ -706,4 +706,27 @@ func TestAFigureIsInkedForTheThemeItIsReadIn(t *testing.T) {
 	if !strings.Contains(runner, "transparent=True") {
 		t.Error("matplotlib saves an opaque figure; it would be a white card on a dark page")
 	}
+
+	// Nor may the stylesheet put one back.
+	//
+	// It used to, deliberately: a figure arrived in dark ink on nothing, so a
+	// white plate was what made it legible against a dark page. Inking the
+	// figure removed the reason and left the plate, and the plate then caused
+	// exactly what it had been added to prevent — white axes on white.
+	//
+	// A background here defeats the inking silently, in one theme only, which
+	// is why it is worth a test rather than a comment.
+	css := string(repoFile(t, "web/static/style.css"))
+	at := strings.Index(css, ".run-figure {")
+	if at < 0 {
+		t.Fatal("the figure rule is gone; check what replaced it")
+	}
+	rule := css[at:]
+	if end := strings.Index(rule, "}"); end > 0 {
+		rule = rule[:end]
+	}
+	if strings.Contains(rule, "background") {
+		t.Errorf("a figure has a background again:\n%s\nthe drawing is inked for the "+
+			"theme, so a plate behind it hides one of the two", rule)
+	}
 }

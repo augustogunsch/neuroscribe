@@ -1370,14 +1370,21 @@ body.is-locked { overflow: hidden; }
 	display: block;
 }
 
-/* The white plate is deliberate rather than a theme slip: matplotlib draws in
-   dark ink on nothing, so against a dark page the axes would be invisible. */
+/* No plate behind a figure.
+ *
+ * There used to be a white one, because a drawing arrived in dark ink on
+ * nothing and would have been invisible against a dark page. That is fixed at
+ * the source now — a figure is inked in the reader's colour before it is shown
+ * (ngInk in run.js) — and the plate became the bug it was there to prevent:
+ * white axes on a white card, which is where this started.
+ *
+ * So the figure sits on the page, on nothing, in both themes. Keep it that
+ * way: a background here silently defeats the inking.
+ */
 .run-figure {
 	display: inline-block;
 	max-width: 100%;
 	height: auto;
-	background: #fff;
-	border-radius: 8px;
 	padding: 0.5rem;
 }
 
