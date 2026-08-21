@@ -16,3 +16,6 @@ go vet ./...
 
 echo "pre-commit: go test"
 go test ./...
+
+echo "pre-commit: browser tests"
+make --no-print-directory test-js

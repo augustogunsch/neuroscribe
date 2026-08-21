@@ -226,8 +226,16 @@ gracefully without them, and every file is checked against `assets.sha256`.
 
 ## Development
 
-`make check` runs the quality gate (gofmt, go vet, go test); `make hooks`
-installs it as a git pre-commit hook (`.githooks/pre-commit`).
+`make check` runs the quality gate (gofmt, go vet, go test, and the browser
+tests); `make hooks` installs it as a git pre-commit hook
+(`.githooks/pre-commit`).
+
+`make test-js` runs the browser half on its own. `web/jstest/` holds
+`node --test` files that load the real scripts out of `web/static/` into a vm
+context with stubbed globals — no node_modules, nothing to install, Node 22 or
+newer. `crypto.js` and `e2e.js` are held to 100% line, branch and function
+coverage and the run fails below it: they are, respectively, the file that
+decides what the server may see and the only place a password is handled.
 
 ## Architecture
 
