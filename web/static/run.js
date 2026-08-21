@@ -356,6 +356,41 @@ function ngCetzFigures(code) {
 	return drawing;
 }
 
+/* A caption is prose, so $…$ in one is a formula.
+ *
+ * It does not arrive as prose, though. The note's math is lifted out before
+ * Markdown is parsed, and that pass deliberately skips code — a fence's
+ * contents have to reach the engine exactly as written. A caption is a comment
+ * inside a fence, so it is skipped along with everything else there, and
+ * "$\\vec{v}$" stayed a literal five characters in the figure and in the PDF.
+ *
+ * So the caption gets its own pass, here and in ngTypstCaption, over the same
+ * delimiters. Only inline: a caption is a line, not a display.
+ */
+const NG_CAPTION_MATH = /\$([^\n$]+?)\$/g;
+
+function ngCaptionInto(el, caption) {
+	const src = String(caption == null ? "" : caption);
+	let at = 0;
+	let m;
+	NG_CAPTION_MATH.lastIndex = 0;
+	while ((m = NG_CAPTION_MATH.exec(src)) !== null) {
+		if (m.index > at) el.appendChild(document.createTextNode(src.slice(at, m.index)));
+		const span = document.createElement("span");
+		span.className = "math inline";
+		if (typeof katex !== "undefined") {
+			// A caption is not worth losing to a typo in it: a formula that
+			// will not parse is shown as what was written.
+			katex.render(m[1], span, { throwOnError: false, displayMode: false });
+		} else {
+			span.textContent = m[0];
+		}
+		el.appendChild(span);
+		at = m.index + m[0].length;
+	}
+	if (at < src.length) el.appendChild(document.createTextNode(src.slice(at)));
+}
+
 /* ngPlotFrame builds the figure a drawing lives in, whichever engine draws it.
  *
  * The block is not decorated, it is replaced: what a reader wants from a plot
@@ -384,7 +419,7 @@ function ngPlotFrame(block, meta) {
 	number.className = "plot-number";
 	const text = document.createElement("span");
 	text.className = "plot-text";
-	text.textContent = meta.caption;
+	ngCaptionInto(text, meta.caption);
 	caption.append(number, text);
 
 	// The source, folded away. Moving the original block in here keeps its
@@ -492,8 +527,12 @@ function ngNumberPlots(root) {
 		var slot = fig.querySelector(".plot-number");
 		if (slot) slot.textContent = ngTF("Figure %s", String(n));
 		fig.id = "figure-" + n;
+		// First claim wins, matching the PDF — where a label may only be
+		// attached once, so the second figure to use a name goes unlabelled.
+		// Overwriting here instead would point the note at the last copy and
+		// the document at the first.
 		var label = fig.dataset.plotLabel;
-		if (label) labels[label] = n;
+		if (label && !Object.prototype.hasOwnProperty.call(labels, label)) labels[label] = n;
 	});
 	ngLinkPlotRefs(root, labels);
 	return labels;

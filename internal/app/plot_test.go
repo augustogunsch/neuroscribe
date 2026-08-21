@@ -401,17 +401,28 @@ func TestTheManualDescribesTheEnginesThisServerHas(t *testing.T) {
 		}
 	}
 
-	// The sample is meant to be copied, so it must be the shape that works —
-	// with the import, which is the line people paste and the line that used
-	// to fail. scripts/pipeline-harness.html compiles this exact snippet.
-	if !strings.Contains(views, "have.cetz ? [") {
-		t.Error("the sample no longer depends on which engine is present")
+	// One sample per engine present, and both when both — offering only the
+	// typesetter's fence hid Python from every server that had it, which is
+	// what this half exists to prevent. Each push guarded by its own flag.
+	samples := views
+	if at := strings.Index(views, "function ngPlotSamples()"); at >= 0 {
+		if end := strings.Index(views[at:], "\n}"); end > 0 {
+			samples = views[at : at+end]
+		}
+	} else {
+		t.Fatal("the samples are no longer built per engine")
 	}
-	if !strings.Contains(views, "\"```plot\"") {
-		t.Error("the copyable sample no longer offers a CeTZ fence")
+	for _, guard := range []string{"if (have.cetz) {", "if (have.python) {"} {
+		if !strings.Contains(samples, guard) {
+			t.Errorf("no sample is offered under %s", guard)
+		}
 	}
-	if !strings.Contains(views, "@preview/cetz:") {
-		t.Error("the sample dropped the import, which is the line people paste")
+	// Both fences, and the CeTZ one with its import — the line people paste and
+	// the line that used to fail. The harness compiles these exact snippets.
+	for _, needed := range []string{"\"```plot\"", "\"```python plot\"", "@preview/cetz:"} {
+		if !strings.Contains(samples, needed) {
+			t.Errorf("the samples no longer contain %s", needed)
+		}
 	}
 
 	// And every string it shows has a translation, since the app ships one.
@@ -432,7 +443,7 @@ func TestTheManualDescribesTheEnginesThisServerHas(t *testing.T) {
 		"A plot fence is drawn by the typesetter",
 		"Examples copied from the web work as written",
 		"Drawing needs a runtime this server does not have",
-		"For 3D surfaces",
+		"Reach for python plot when you need 3D",
 	} {
 		whole := ""
 		for s := range found {
@@ -448,5 +459,127 @@ func TestTheManualDescribesTheEnginesThisServerHas(t *testing.T) {
 		if !strings.Contains(pt, `"`+whole+`":`) {
 			t.Errorf("no pt-BR translation for the exact string %q", whole)
 		}
+	}
+}
+
+// A caption is prose, and prose has formulas in it.
+//
+// It is the one piece of prose that never passes the math stage: formulas are
+// lifted out of a note before Markdown is parsed, and a caption is a comment
+// inside a fence, which that stage skips on purpose so the drawing's code
+// reaches the engine as written. So "$\\vec{v}$" in a caption arrived as five
+// literal characters in the figure and, after escaping, as literal dollars in
+// the PDF.
+func TestACaptionCanNameWhatItDescribes(t *testing.T) {
+	run := readAsset(t, "static/run.js")
+	if !strings.Contains(run, "ngCaptionInto(text, meta.caption)") {
+		t.Error("a caption is written as plain text again; its math would show as dollars")
+	}
+	if !strings.Contains(run, "katex.render(") {
+		t.Error("nothing typesets the caption's formulas")
+	}
+	// A caption is not worth losing to a typo inside it.
+	if !strings.Contains(run, "throwOnError: false") {
+		t.Error("a malformed formula would take the whole caption with it")
+	}
+
+	typst := readAsset(t, "static/typst.js")
+	if !strings.Contains(typst, "function ngTypstCaption") {
+		t.Fatal("the PDF has no caption-specific handling, so $…$ is escaped to dollars")
+	}
+	if n := strings.Count(typst, "ngTypstCaption(meta.caption"); n != 2 {
+		t.Errorf("%d of 2 figure kinds typeset their caption's math", n)
+	}
+	// The same mitex call the prose uses, so a formula looks the same wherever
+	// in the document it appears.
+	if !strings.Contains(typst, `"#mi(" + ngTypstStr(part) + ")"`) {
+		t.Error("a caption's math no longer goes through mitex like every other formula")
+	}
+}
+
+// A label may be claimed once.
+//
+// Typst refuses a whole document in which one occurs twice — not the
+// reference, the export — and a note earns that by being copied and pasted,
+// which is a normal thing to do to a chapter. Losing the PDF entirely to that
+// is out of proportion, so the first figure to claim a name keeps it.
+//
+// The note has to agree, or a reference points at one picture on screen and a
+// different one in the document. It used to disagree: the note overwrote, so
+// it resolved to the last copy while the PDF refused to build at all.
+func TestADuplicatedLabelCostsTheLabelNotTheDocument(t *testing.T) {
+	typst := readAsset(t, "static/typst.js")
+	if !strings.Contains(typst, "claim: (name)") {
+		t.Fatal("labels are no longer claimed, so a duplicate would fail the export")
+	}
+	if !strings.Contains(typst, "if (!label || ctx.claimed[label]) return \"\";") {
+		t.Error("a repeated label is emitted again; Typst refuses the document")
+	}
+	if n := strings.Count(typst, "ctx.claim(meta.label)"); n != 2 {
+		t.Errorf("%d of 2 figure kinds claim their label", n)
+	}
+	// And no path may still write a label directly.
+	if strings.Contains(typst, `" <" + ngFigureLabel(meta.label) + ">"`) {
+		t.Error("a figure still attaches its label without claiming it first")
+	}
+
+	run := readAsset(t, "static/run.js")
+	if !strings.Contains(run, "hasOwnProperty.call(labels, label)") {
+		t.Error("the note overwrites a duplicated label, so it would resolve to the " +
+			"last copy while the PDF points at the first")
+	}
+}
+
+// The examples in the README are compiled, not merely read.
+//
+// An example that no longer draws is a documentation bug of the worst kind:
+// the reader types exactly what they were told and it fails, and nobody
+// reviewing the prose would catch it. scripts/pipeline-harness.html runs every
+// one of them through the real pipeline.
+func TestTheDocumentedExamplesAreKeptRunnable(t *testing.T) {
+	harness := string(repoFile(t, "scripts/pipeline-harness.html"))
+	if !strings.Contains(harness, "readme-examples.json") {
+		t.Error("the harness no longer compiles what the README publishes")
+	}
+	// Read from the README rather than copied into the harness, because a copy
+	// drifts and then proves nothing about the published text.
+	extractor := string(repoFile(t, "scripts/readme-examples.py"))
+	if !strings.Contains(extractor, "## Drawing") {
+		t.Error("the extractor no longer reads the Drawing section")
+	}
+
+	// The generated file has to match the README it was generated from, or the
+	// harness checks a stale copy and reports success for text nobody ran.
+	readme := string(repoFile(t, "README.md"))
+	start := strings.Index(readme, "\n## Drawing\n")
+	end := strings.Index(readme, "\n## How offline works\n")
+	if start < 0 || end < 0 {
+		t.Fatal("the Drawing section's headings moved; the extractor will fail too")
+	}
+	// (?m) so ^ and $ mean line boundaries, matching the extractor's re.M
+	fences := regexp.MustCompile("(?sm)^```(plot|python plot)\n(.*?)^```$")
+	want := len(fences.FindAllString(readme[start:end], -1))
+	generated := string(repoFile(t, "scripts/readme-examples.json"))
+	got := strings.Count(generated, `"lang":`)
+	if want != got {
+		t.Errorf("the README shows %d examples, readme-examples.json has %d; "+
+			"run scripts/readme-examples.py", want, got)
+	}
+
+	// And the server it documents, since a plain file server silently breaks
+	// every Python figure while everything else passes.
+	server := string(repoFile(t, "scripts/harness-serve.py"))
+	for _, needed := range []string{
+		"Access-Control-Allow-Origin", "Cross-Origin-Resource-Policy", "ThreadingHTTPServer",
+	} {
+		if !strings.Contains(server, needed) {
+			t.Errorf("the harness server no longer sets up %s; Pyodide will fail to fetch", needed)
+		}
+	}
+	// The command itself, not a mention of the filename further down: the
+	// instruction is the part that has to be right, and the first version of
+	// this check passed while the instruction said the wrong thing.
+	if !strings.Contains(harness, "python3 scripts/harness-serve.py") {
+		t.Error("the harness still tells people to use a plain file server")
 	}
 }

@@ -131,44 +131,68 @@ function ngPlotHint() {
 	return ngEl("li", { text: ngT("Add plot to a Python block and it draws itself with matplotlib — charts, function graphs, vector fields and 3D surfaces — in the note and in the exported PDF.") });
 }
 
-function ngPlotExample() {
+/* The samples, one per engine this server has.
+ *
+ * Both when both, which is the common case and was briefly not what this did:
+ * offering only the typesetter's fence hid Python from every server that had
+ * it, and the two are not substitutes — one draws instantly and the other
+ * knows what a Bessel function is.
+ *
+ * Each is the shape people actually paste. The CeTZ one keeps its imports,
+ * because every published example has them and they are what used to fail.
+ */
+function ngPlotSamples() {
 	const have = ngPlotEngines();
-	if (!have.cetz && !have.python) return ngEl("span");
+	const samples = [];
+	if (have.cetz) {
+		samples.push({
+			name: ngT("Drawn by the typesetter — instant, and vector in the PDF"),
+			code: [
+				"```plot",
+				"//: label=wave",
+				"//: A sine wave over two periods.",
+				"#import \"@preview/cetz:0.3.2\"",
+				"#import \"@preview/cetz-plot:0.1.1\": plot",
+				"",
+				"#cetz.canvas({",
+				"  plot.plot(size: (8, 5), x-tick-step: 2, y-tick-step: 0.5, {",
+				"    plot.add(domain: (-2*calc.pi, 2*calc.pi), x => calc.sin(x))",
+				"  })",
+				"})",
+				"```",
+			].join("\n"),
+		});
+	}
+	if (have.python) {
+		samples.push({
+			name: ngT("Drawn by matplotlib — numpy, scipy, sympy and 3D"),
+			code: [
+				"```python plot",
+				"#: label=decay",
+				"#: A damped oscillation, $e^{-x/4}\\sin 2x$.",
+				"import numpy as np, matplotlib.pyplot as plt",
+				"",
+				"x = np.linspace(0, 12, 500)",
+				"fig, ax = plt.subplots(figsize=(6, 3.5))",
+				"ax.plot(x, np.exp(-x/4) * np.sin(2*x))",
+				"ax.spines[[\"top\", \"right\"]].set_visible(False)",
+				"ax.grid(alpha=.3)",
+				"```",
+			].join("\n"),
+		});
+	}
+	return samples;
+}
 
-	// The faster engine, when it is there. A fence someone can lift straight
-	// into a note says it better than a paragraph would, so this is the shape
-	// the examples on the web have: the import included, because that is what
-	// people paste and it is meant to work.
-	const sample = have.cetz ? [
-		"```plot",
-		"//: label=wave",
-		"//: A sine wave over two periods.",
-		"#import \"@preview/cetz:0.3.2\"",
-		"#import \"@preview/cetz-plot:0.1.1\": plot",
-		"",
-		"#cetz.canvas({",
-		"  plot.plot(size: (8, 5), x-tick-step: 2, y-tick-step: 0.5, {",
-		"    plot.add(domain: (-2*calc.pi, 2*calc.pi), x => calc.sin(x))",
-		"  })",
-		"})",
-		"```",
-	].join("\n") : [
-		"```python plot",
-		"import numpy as np, matplotlib.pyplot as plt",
-		"",
-		"x = np.linspace(-2*np.pi, 2*np.pi, 400)",
-		"plt.plot(x, np.sin(x), label=\"sin x\")",
-		"plt.legend(); plt.grid(True)",
-		"```",
-	].join("\n");
-
+// One sample, with the button that puts it on the clipboard.
+function ngPlotSampleBlock(sample, only) {
 	const pre = ngEl("pre", { class: "plot-sample" });
-	pre.appendChild(ngEl("code", { text: sample }));
+	pre.appendChild(ngEl("code", { text: sample.code }));
 
 	const copy = ngEl("button", { type: "button", class: "linklike", text: ngT("Copy") });
 	copy.addEventListener("click", async function () {
 		try {
-			await navigator.clipboard.writeText(sample);
+			await navigator.clipboard.writeText(sample.code);
 			copy.textContent = ngT("Copied");
 			setTimeout(function () { copy.textContent = ngT("Copy"); }, 1500);
 		} catch (err) {
@@ -176,24 +200,43 @@ function ngPlotExample() {
 		}
 	});
 
+	const parts = [];
+	// With one engine the heading says nothing the paragraph above has not.
+	if (!only) parts.push(ngEl("p", { class: "plot-sample-name", text: sample.name }));
+	parts.push(pre, ngEl("p", { class: "plot-help-actions" }, [copy]));
+	return parts;
+}
+
+function ngPlotExample() {
+	const have = ngPlotEngines();
+	const samples = ngPlotSamples();
+	if (!samples.length) return ngEl("span");
+
 	const parts = [
 		ngEl("summary", { text: ngT("How to draw a plot") }),
 		ngEl("p", { class: "page-hint", text: have.cetz
 			? ngT("A plot fence is drawn by the typesetter. Start a line with //: to caption it, or //: label=name to give it a name that @name points at from the prose.")
 			: ngT("Any Python fence with the word plot after the language draws itself when the note opens. A plain python fence keeps its Run button and stays put until you press it.") }),
-		pre,
-		ngEl("p", { class: "plot-help-actions" }, [copy]),
 	];
+	samples.forEach(function (sample) {
+		ngPlotSampleBlock(sample, samples.length === 1).forEach(function (el) {
+			parts.push(el);
+		});
+	});
+
+	// A caption is prose: $…$ in one is a formula, and the directive marker is
+	// whichever comment the fence's language uses.
+	parts.push(ngEl("p", { class: "page-hint", text: ngT("Directives open a fence as a comment — //: in a plot block, #: in a Python one — so the code still runs if you paste it into a file. A caption may contain math between dollar signs, and figures number themselves in the order they appear.") }));
+
 	if (have.cetz) {
-		// Two things people hit on their first fence: pasted examples import
-		// by version, and a body that opens with "#" is markup rather than a
-		// sequence of expressions.
+		// The thing people hit first: every example on the web imports by
+		// version, and those imports used to fail here.
 		parts.push(ngEl("p", { class: "page-hint", text: ngT("Examples copied from the web work as written — the import is pointed at the copy kept here, whichever version it names. Nothing is downloaded, and nothing leaves this device.") }));
 	}
-	if (have.cetz && have.python) {
-		parts.push(ngEl("p", { class: "page-hint", text: ngT("For 3D surfaces, or anything numpy, scipy and sympy can compute, write python plot instead. The first of those in a session takes a few seconds while Python starts.") }));
-	} else if (have.python) {
-		parts.push(ngEl("p", { class: "page-hint", text: ngT("The first one in a session takes a few seconds while Python starts. Everything numpy, scipy and sympy can compute is available to it, and nothing leaves this device.") }));
+	if (have.python) {
+		parts.push(ngEl("p", { class: "page-hint", text: have.cetz
+			? ngT("Reach for python plot when you need 3D, or anything numpy, scipy and sympy can compute. The first of those in a session takes a few seconds while Python starts.")
+			: ngT("The first one in a session takes a few seconds while Python starts. Everything numpy, scipy and sympy can compute is available to it, and nothing leaves this device.") }));
 	}
 	return ngEl("details", { class: "plot-help" }, parts);
 }

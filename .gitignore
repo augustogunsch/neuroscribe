@@ -13,3 +13,6 @@ backups/
 /typst
 dist/
 downloads/
+
+# Claude Code: local session settings and its scratch worktrees
+.claude/

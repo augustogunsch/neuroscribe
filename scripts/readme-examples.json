@@ -1,0 +1,38 @@
+[
+ {
+  "lang": "plot",
+  "code": "//: label=wave\n//: A sine wave over two periods.\ncanvas({\n  plot.plot(size: (8, 5), x-tick-step: 2, y-tick-step: 0.5, {\n    plot.add(domain: (-2*calc.pi, 2*calc.pi), x => calc.sin(x))\n  })\n})\n"
+ },
+ {
+  "lang": "plot",
+  "code": "#import \"@preview/cetz:0.3.2\"\n#import cetz.draw: *\n\n#cetz.canvas({\n  line((0, 0), (2, 1), mark: (end: \">\"))\n})\n"
+ },
+ {
+  "lang": "python plot",
+  "code": "#: label=decay\n#: A damped oscillation and its envelope, $e^{-x/4}$.\nimport numpy as np, matplotlib.pyplot as plt\n\nx = np.linspace(0, 12, 500)\nenv = np.exp(-x / 4)\nfig, ax = plt.subplots(figsize=(6, 3.5))\nax.plot(x, env * np.sin(2 * x), label=r\"$e^{-x/4}\\sin 2x$\")\nax.plot(x, env, \"--\", lw=1, color=\"grey\", label=r\"$e^{-x/4}$\")\nax.spines[[\"top\", \"right\"]].set_visible(False)\nax.spines[[\"left\", \"bottom\"]].set_position(\"zero\")\nax.legend(); ax.grid(alpha=.3)\n"
+ },
+ {
+  "lang": "python plot",
+  "code": "#: label=sum\n#: $\\vec{a} + \\vec{b}$, by the parallelogram rule.\nimport matplotlib.pyplot as plt\n\na, b = (3, 1), (1, 2)\ns = (a[0] + b[0], a[1] + b[1])\nfig, ax = plt.subplots(figsize=(4, 4))\nfor (x, y), c, name in [(a, \"C0\", \"a\"), (b, \"C1\", \"b\"), (s, \"C3\", \"a+b\")]:\n    ax.annotate(\"\", (x, y), (0, 0), arrowprops=dict(arrowstyle=\"->\", color=c, lw=2))\n    ax.text(x, y, f\" ${name}$\", color=c, va=\"center\")\nax.plot([a[0], s[0]], [a[1], s[1]], \"k:\", lw=1)\nax.plot([b[0], s[0]], [b[1], s[1]], \"k:\", lw=1)\nax.set_xlim(-.5, 4.5); ax.set_ylim(-.5, 3.5)\nax.set_aspect(\"equal\"); ax.grid(alpha=.3)\n"
+ },
+ {
+  "lang": "python plot",
+  "code": "#: label=field\n#: The field $(-y, x)$, which rotates.\nimport numpy as np, matplotlib.pyplot as plt\n\nX, Y = np.meshgrid(np.linspace(-2, 2, 15), np.linspace(-2, 2, 15))\nfig, ax = plt.subplots(figsize=(4.5, 4.5))\nax.quiver(X, Y, -Y, X, np.hypot(X, Y), cmap=\"viridis\", pivot=\"mid\")\nax.set_aspect(\"equal\")\n"
+ },
+ {
+  "lang": "python plot",
+  "code": "#: label=surface\n#: The saddle $z = x^2 - y^2$.\nimport numpy as np, matplotlib.pyplot as plt\n\nfig = plt.figure()\nax = fig.add_subplot(projection=\"3d\")\nX, Y = np.meshgrid(np.linspace(-3, 3, 40), np.linspace(-3, 3, 40))\nax.plot_surface(X, Y, X**2 - Y**2, cmap=\"viridis\")\n"
+ },
+ {
+  "lang": "python plot",
+  "code": "#: The second derivative of $x \\sin x$, found rather than written out.\nimport numpy as np, sympy as sp, matplotlib.pyplot as plt\n\nx = sp.symbols(\"x\")\ng = sp.lambdify(x, sp.diff(x * sp.sin(x), x, 2), \"numpy\")\nt = np.linspace(-8, 8, 400)\nplt.plot(t, g(t)); plt.grid(alpha=.3)\n"
+ },
+ {
+  "lang": "plot",
+  "code": "//: label=rot\n//: The rotational field $(-y, x)$.\n#import \"@preview/cetz:0.3.2\"\n#import cetz.draw: *\n\n#cetz.canvas({\n  for x in range(-2, 3) {\n    for y in range(-2, 3) {\n      // the field vanishes at the origin, and a zero-length arrow has no\n      // direction to point in\n      if x != 0 or y != 0 {\n        line((x, y), (x - y/4, y + x/4), mark: (end: \">\", scale: .4))\n      }\n    }\n  }\n})\n"
+ },
+ {
+  "lang": "python plot",
+  "code": "#: label=shear\n#: A shear, $(y, 0)$.\nimport numpy as np, matplotlib.pyplot as plt\n\nX, Y = np.meshgrid(np.linspace(-2, 2, 9), np.linspace(-2, 2, 9))\nplt.quiver(X, Y, Y, np.zeros_like(X), pivot=\"mid\")\nplt.gca().set_aspect(\"equal\")\n"
+ }
+]

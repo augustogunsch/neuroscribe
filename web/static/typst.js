@@ -166,6 +166,26 @@ function ngTypstProse(s, figures) {
 	}).join("");
 }
 
+/* A figure's caption, which is prose that never went through the math pass.
+ *
+ * Everything else in a note has its formulas lifted out before Markdown is
+ * parsed; a caption is a comment inside a fence, and fences are skipped by
+ * that pass on purpose, so its "$…$" arrives here as literal text about to be
+ * escaped into literal dollars. Splitting on the same delimiters here is what
+ * makes a caption able to name the thing it is a caption for.
+ *
+ * Inline only, and the same #mi() mitex call the prose uses, so a formula
+ * looks the same wherever it appears in the document.
+ */
+const NG_CAPTION_MATH_SPLIT = /\$([^\n$]+?)\$/;
+
+function ngTypstCaption(s, figures) {
+	return String(s == null ? "" : s).split(NG_CAPTION_MATH_SPLIT).map((part, i) => {
+		if (i % 2 === 0) return ngTypstProse(part, figures);
+		return "#mi(" + ngTypstStr(part) + ")";
+	}).join("");
+}
+
 function ngTypstFigRefs(text, figures) {
 	if (!figures || !Object.keys(figures).length) return ngTypstText(text);
 	return String(text).split(NG_FIG_REF_SPLIT).map((part, i) => {
@@ -294,8 +314,8 @@ function ngTypstRenderer(ctx) {
 					// wrapped by the same rule the note draws it under, so the
 					// two cannot disagree about what mode the body is in
 					out.push("#figure(\n  " + ngCetzBlock(t.text) +
-						(meta.caption ? ",\n  caption: [" + ngTypstProse(meta.caption, ctx.figures) + "]" : "") +
-						"\n)" + (meta.label ? " <" + ngFigureLabel(meta.label) + ">" : "") + "\n");
+						(meta.caption ? ",\n  caption: [" + ngTypstCaption(meta.caption, ctx.figures) + "]" : "") +
+						"\n)" + (meta.label ? ctx.claim(meta.label) : "") + "\n");
 					return;
 				}
 
@@ -306,8 +326,8 @@ function ngTypstRenderer(ctx) {
 						const name = ctx.embedSVG(svg);
 						if (!name) return;
 						out.push("#figure(\n  image(" + ngTypstStr(name) + ", width: 85%)" +
-							(meta.caption ? ",\n  caption: [" + ngTypstProse(meta.caption) + "]" : "") +
-							"\n)" + (meta.label ? " <" + ngFigureLabel(meta.label) + ">" : "") + "\n");
+							(meta.caption ? ",\n  caption: [" + ngTypstCaption(meta.caption, ctx.figures) + "]" : "") +
+							"\n)" + (meta.label ? ctx.claim(meta.label) : "") + "\n");
 					});
 					return;
 				}
@@ -434,6 +454,25 @@ function ngNoteToTypst(note, opts) {
 		plots: (opts && opts.plots) || {},
 		// which labels this note defines, so a stray "@" in prose stays an "@"
 		figures: (opts && opts.figures) || {},
+		/* A label may only be attached once.
+		 *
+		 * Typst refuses a document where one occurs twice — not the reference,
+		 * the whole export — and a note earns that the easy way: copy a
+		 * chapter, paste it, and both copies carry the same labels. Losing the
+		 * entire PDF to that is out of all proportion to it.
+		 *
+		 * So the first figure to claim a name keeps it and later ones are
+		 * numbered but unlabelled, which is what an unlabelled figure already
+		 * does. The note resolves the same way, so a reference points at the
+		 * same picture in both.
+		 */
+		claimed: {},
+		claim: (name) => {
+			const label = ngFigureLabel(name);
+			if (!label || ctx.claimed[label]) return "";
+			ctx.claimed[label] = true;
+			return " <" + label + ">";
+		},
 		// Figures are not note images: they have no record and no address,
 		// they were drawn a moment ago from the note's own code. They still
 		// reach the compiler the same way, as a file beside the document.

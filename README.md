@@ -381,17 +381,92 @@ a test checks that list against the one the browser uses.
 
 ### `python plot` — matplotlib
 
-Everything numpy, scipy and sympy can compute, plus 3D.
+Everything numpy, scipy and sympy can compute, plus 3D. Whatever figures are
+open when the block finishes are the figures it drew, so there is nothing to
+call at the end — no `show`, no `savefig`.
+
+A function, with the axes through the origin where a textbook puts them:
+
+````markdown
+```python plot
+#: label=decay
+#: A damped oscillation and its envelope, $e^{-x/4}$.
+import numpy as np, matplotlib.pyplot as plt
+
+x = np.linspace(0, 12, 500)
+env = np.exp(-x / 4)
+fig, ax = plt.subplots(figsize=(6, 3.5))
+ax.plot(x, env * np.sin(2 * x), label=r"$e^{-x/4}\sin 2x$")
+ax.plot(x, env, "--", lw=1, color="grey", label=r"$e^{-x/4}$")
+ax.spines[["top", "right"]].set_visible(False)
+ax.spines[["left", "bottom"]].set_position("zero")
+ax.legend(); ax.grid(alpha=.3)
+```
+````
+
+Vectors, and the parallelogram that adds them:
+
+````markdown
+```python plot
+#: label=sum
+#: $\vec{a} + \vec{b}$, by the parallelogram rule.
+import matplotlib.pyplot as plt
+
+a, b = (3, 1), (1, 2)
+s = (a[0] + b[0], a[1] + b[1])
+fig, ax = plt.subplots(figsize=(4, 4))
+for (x, y), c, name in [(a, "C0", "a"), (b, "C1", "b"), (s, "C3", "a+b")]:
+    ax.annotate("", (x, y), (0, 0), arrowprops=dict(arrowstyle="->", color=c, lw=2))
+    ax.text(x, y, f" ${name}$", color=c, va="center")
+ax.plot([a[0], s[0]], [a[1], s[1]], "k:", lw=1)
+ax.plot([b[0], s[0]], [b[1], s[1]], "k:", lw=1)
+ax.set_xlim(-.5, 4.5); ax.set_ylim(-.5, 3.5)
+ax.set_aspect("equal"); ax.grid(alpha=.3)
+```
+````
+
+A field, sampled on a grid and coloured by magnitude:
+
+````markdown
+```python plot
+#: label=field
+#: The field $(-y, x)$, which rotates.
+import numpy as np, matplotlib.pyplot as plt
+
+X, Y = np.meshgrid(np.linspace(-2, 2, 15), np.linspace(-2, 2, 15))
+fig, ax = plt.subplots(figsize=(4.5, 4.5))
+ax.quiver(X, Y, -Y, X, np.hypot(X, Y), cmap="viridis", pivot="mid")
+ax.set_aspect("equal")
+```
+````
+
+And a surface, which is the thing CeTZ cannot do at all:
 
 ````markdown
 ```python plot
 #: label=surface
-#: A saddle.
+#: The saddle $z = x^2 - y^2$.
 import numpy as np, matplotlib.pyplot as plt
+
 fig = plt.figure()
 ax = fig.add_subplot(projection="3d")
 X, Y = np.meshgrid(np.linspace(-3, 3, 40), np.linspace(-3, 3, 40))
 ax.plot_surface(X, Y, X**2 - Y**2, cmap="viridis")
+```
+````
+
+sympy is there too, so a figure can plot something it derived rather than
+something you worked out first:
+
+````markdown
+```python plot
+#: The second derivative of $x \sin x$, found rather than written out.
+import numpy as np, sympy as sp, matplotlib.pyplot as plt
+
+x = sp.symbols("x")
+g = sp.lambdify(x, sp.diff(x * sp.sin(x), x, 2), "numpy")
+t = np.linspace(-8, 8, 400)
+plt.plot(t, g(t)); plt.grid(alpha=.3)
 ```
 ````
 
@@ -404,10 +479,81 @@ into a file:
 - `label=name` gives the figure a name.
 - anything else is the caption.
 
+**A caption is prose**, so `$…$` in one is a formula, rendered in the note and
+typeset in the PDF like any other math:
+
+```
+#: The field $(-y, x)$, whose divergence is $\nabla \cdot F = 0$.
+```
+
 Figures number themselves in the order they appear, and `@name` in the prose
 becomes a link to *Figure 2*. An `@` that names no figure is left alone, so an
 email address stays an email address. The web numbers within a chapter and the
 PDF numbers across the whole note, which is what equations already do here.
+
+Written out, a chapter that refers to two of its figures:
+
+````markdown
+Both fields below are divergence-free, but only one of them circulates.
+
+```plot
+//: label=rot
+//: The rotational field $(-y, x)$.
+#import "@preview/cetz:0.3.2"
+#import cetz.draw: *
+
+#cetz.canvas({
+  for x in range(-2, 3) {
+    for y in range(-2, 3) {
+      // the field vanishes at the origin, and a zero-length arrow has no
+      // direction to point in
+      if x != 0 or y != 0 {
+        line((x, y), (x - y/4, y + x/4), mark: (end: ">", scale: .4))
+      }
+    }
+  }
+})
+```
+
+```python plot
+#: label=shear
+#: A shear, $(y, 0)$.
+import numpy as np, matplotlib.pyplot as plt
+
+X, Y = np.meshgrid(np.linspace(-2, 2, 9), np.linspace(-2, 2, 9))
+plt.quiver(X, Y, Y, np.zeros_like(X), pivot="mid")
+plt.gca().set_aspect("equal")
+```
+
+@rot turns about the origin, while @shear slides every row past the one below
+it, and neither compresses.
+````
+
+That renders as *Figure 1* and *Figure 2* — links in the note, real
+cross-references in the PDF.
+
+Equations are referred to differently, with `\label{}` and `\eqref{}` written
+*inside* the math rather than with `@`:
+
+```
+$$ \nabla \cdot F = 0 \label{div} $$
+
+…which is the condition in \eqref{div}.
+```
+
+The two share a document but never collide: a figure's label is prefixed apart
+from an equation's.
+
+Three things worth knowing:
+
+- **A label is optional.** A fence with only a caption still gets a number; it
+  just cannot be pointed at.
+- **The first figure to claim a name keeps it.** Copy a chapter and paste it,
+  and the duplicates are still drawn and still numbered, but references go to
+  the first copy — in the note and in the PDF alike.
+- **`@` is only a reference when it names a figure you defined.** Anything else
+  is left exactly as written, so an email address in prose stays an email
+  address.
 
 ### What each one costs
 
