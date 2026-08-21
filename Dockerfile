@@ -26,7 +26,7 @@ COPY . .
 # minutes of compile time, and without them every image rebuild pays it again.
 RUN --mount=type=cache,target=/go/pkg/mod \
 	--mount=type=cache,target=/root/.cache/go-build \
-	CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/neuroscribe .
+	CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/neuroscribe ./cmd/neuroscribe
 
 # ---- runtime --------------------------------------------------------------
 # Digest = debian:bookworm-slim; bump tag and digest together.

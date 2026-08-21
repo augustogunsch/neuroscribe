@@ -28,9 +28,16 @@ sha256_of() {
 	fi
 }
 
-expected=$(awk -v want="$dest" '$1 !~ /^#/ && $2 == want { print $1 }' "$manifest")
+# The manifest names each file by the path the browser fetches it at, which is
+# also the path it is embedded under — "static/vendor/purify.min.js". Where the
+# repository happens to keep that file is a separate question, and the answer
+# is under web/. Stripping the prefix here keeps the pin tied to the identity
+# that matters rather than to a directory layout.
+key=${dest#web/}
+
+expected=$(awk -v want="$key" '$1 !~ /^#/ && $2 == want { print $1 }' "$manifest")
 if [ -z "$expected" ]; then
-	echo "$dest: no checksum pinned in $manifest" >&2
+	echo "$key: no checksum pinned in $manifest" >&2
 	echo "  add one deliberately — this file ends up running in a browser" >&2
 	exit 1
 fi

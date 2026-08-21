@@ -7,7 +7,7 @@ GO      ?= go
 all: build
 
 build:
-	$(GO) build -o $(BINARY) .
+	$(GO) build -o $(BINARY) ./cmd/neuroscribe
 
 # The binary is static (CGO off), so the right way to deploy to a small server
 # is to build here and copy the result: the pure-Go SQLite alone costs minutes
@@ -20,7 +20,7 @@ release:
 	@mkdir -p dist
 	CGO_ENABLED=0 GOOS=$(RELEASE_GOOS) GOARCH=$(RELEASE_GOARCH) \
 		$(GO) build -trimpath -ldflags="-s -w" \
-		-o dist/$(BINARY)-$(RELEASE_GOOS)-$(RELEASE_GOARCH) .
+		-o dist/$(BINARY)-$(RELEASE_GOOS)-$(RELEASE_GOARCH) ./cmd/neuroscribe
 	@ls -lh dist/$(BINARY)-$(RELEASE_GOOS)-$(RELEASE_GOARCH) | awk '{print $$5, $$9}'
 
 # .env.local (untracked) is sourced when present — see .env.example
@@ -134,12 +134,12 @@ typst:
 # Versions and hashes are recorded in assets.sha256 — bump both together.
 VENDOR_NPM := https://cdn.jsdelivr.net/npm
 vendor:
-	@$(FETCH) $(VENDOR_NPM)/dompurify@3.1.6/dist/purify.min.js  static/vendor/purify.min.js
-	@$(FETCH) $(VENDOR_NPM)/marked@12.0.2/marked.min.js         static/vendor/marked.min.js
-	@$(FETCH) $(VENDOR_NPM)/katex@0.16.21/dist/katex.min.js     static/vendor/katex.min.js
-	@$(FETCH) $(VENDOR_NPM)/katex@0.16.21/dist/katex.min.css    static/vendor/katex.min.css
-	@$(FETCH) $(VENDOR_NPM)/altcha@1.0.6/dist/altcha.min.js     static/vendor/altcha.min.js
-	@$(FETCH) $(VENDOR_NPM)/zxcvbn@4.4.2/dist/zxcvbn.js         static/vendor/zxcvbn.min.js
+	@$(FETCH) $(VENDOR_NPM)/dompurify@3.1.6/dist/purify.min.js  web/static/vendor/purify.min.js
+	@$(FETCH) $(VENDOR_NPM)/marked@12.0.2/marked.min.js         web/static/vendor/marked.min.js
+	@$(FETCH) $(VENDOR_NPM)/katex@0.16.21/dist/katex.min.js     web/static/vendor/katex.min.js
+	@$(FETCH) $(VENDOR_NPM)/katex@0.16.21/dist/katex.min.css    web/static/vendor/katex.min.css
+	@$(FETCH) $(VENDOR_NPM)/altcha@1.0.6/dist/altcha.min.js     web/static/vendor/altcha.min.js
+	@$(FETCH) $(VENDOR_NPM)/zxcvbn@4.4.2/dist/zxcvbn.js         web/static/vendor/zxcvbn.min.js
 	@echo "vendor libraries verified against assets.sha256"
 
 # Everything the browser needs to run code and typeset. Re-running this on a
