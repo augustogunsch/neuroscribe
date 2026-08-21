@@ -263,6 +263,13 @@ function enhance(root) {
 			}
 		}
 	});
+	// A fence whose language is "plot" is drawn by the typesetter rather than
+	// run: it is Typst, not a program, and there is nothing to execute.
+	root.querySelectorAll(".codeblock[data-lang=\"plot\"]").forEach(function (block) {
+		if (block.dataset.plotDrawn) return;
+		ngDrawCetz(block);
+	});
+
 	root.querySelectorAll(".codeblock[data-lang]").forEach(function (block) {
 		var lang = runnableLang(block.dataset.lang);
 		if (!lang || block.querySelector(".run-btn")) return;

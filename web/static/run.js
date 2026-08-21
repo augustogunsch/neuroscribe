@@ -302,8 +302,11 @@ function ngPlotMeta(code) {
 	for (var i = 0; i < lines.length; i++) {
 		var line = lines[i].trim();
 		if (!line) continue;
-		if (line.indexOf("#:") !== 0) break;
-		var rest = line.slice(2).trim();
+		// "#:" in Python, "//:" in Typst — a comment in whichever language the
+		// fence is written in, so the source still runs and still pastes.
+		var directive = /^(?:#|\/\/)\s*:\s?(.*)$/.exec(line);
+		if (!directive) break;
+		var rest = directive[1].trim();
 		var m = /^label\s*=\s*([A-Za-z0-9_-]{1,64})$/.exec(rest);
 		if (m) {
 			label = label || m[1];
@@ -314,7 +317,46 @@ function ngPlotMeta(code) {
 	return { caption: caption.join(" ").trim(), label: label };
 }
 
-/* ngDrawPlot turns a marked code block into a figure.
+/* ngDrawCetz draws a ```plot fence with the typesetter.
+ *
+ * The same figure, caption and numbering as a Python plot — the difference is
+ * only which engine produced the SVG, and by the time it is on the page there
+ * is nothing to tell them apart. No Run button, because a drawing is not a
+ * program: the source opens and closes with the same small control.
+ */
+async function ngDrawCetz(block) {
+	if (typeof ngCetzFigure !== "function") return;
+	const pre = block.querySelector("pre");
+	if (!pre || block.dataset.plotDrawn) return;
+	const code = pre.textContent;
+	const parts = ngPlotFrame(block, ngPlotMeta(code));
+
+	try {
+		const svg = await ngCetzFigures(code);
+		parts.stage.replaceChildren.apply(parts.stage, ngFigureElements([svg]));
+		ngNumberPlots(parts.figure.closest("[data-view], article, body") || document);
+	} catch (err) {
+		ngPlotFailed(parts, String((err && err.message) || err));
+	}
+}
+
+/* Drawn once per source per session. Compiling is fast, but a chapter that
+ * re-renders should not recompile what has not changed — and, as with the
+ * Python path, what is remembered is the promise, so two renders in the same
+ * millisecond join one compilation instead of queueing two. */
+const ngCetzCache = new Map();
+
+function ngCetzFigures(code) {
+	if (ngCetzCache.has(code)) return ngCetzCache.get(code);
+	const drawing = ngCetzFigure(code).catch(function (err) {
+		ngCetzCache.delete(code);
+		throw err;
+	});
+	ngCetzCache.set(code, drawing);
+	return drawing;
+}
+
+/* ngPlotFrame builds the figure a drawing lives in, whichever engine draws it.
  *
  * The block is not decorated, it is replaced: what a reader wants from a plot
  * is the picture, and a picture wearing the frame of a code listing reads as
@@ -322,41 +364,36 @@ function ngPlotMeta(code) {
  * still there, folded away behind a small control, because a figure whose
  * source you cannot see is a figure you cannot check.
  */
-async function ngDrawPlot(lang, block, btn) {
-	var pre = block.querySelector("pre");
-	if (!pre || block.dataset.plotDrawn) return;
+function ngPlotFrame(block, meta) {
 	block.dataset.plotDrawn = "1";
-	var code = pre.textContent;
-	var meta = ngPlotMeta(code);
 
-	var figure = document.createElement("figure");
+	const figure = document.createElement("figure");
 	figure.className = "plot";
 	if (meta.label) figure.dataset.plotLabel = meta.label;
 
-	var stage = document.createElement("div");
+	const stage = document.createElement("div");
 	stage.className = "plot-stage";
-	var note = document.createElement("span");
+	const note = document.createElement("span");
 	note.className = "run-meta";
 	note.textContent = ngT("Drawing…");
 	stage.appendChild(note);
 
-	var caption = document.createElement("figcaption");
+	const caption = document.createElement("figcaption");
 	caption.className = "plot-caption";
-	var number = document.createElement("span");
+	const number = document.createElement("span");
 	number.className = "plot-number";
-	var text = document.createElement("span");
+	const text = document.createElement("span");
 	text.className = "plot-text";
 	text.textContent = meta.caption;
 	caption.append(number, text);
 
-	// The source, folded away. Moving the original block in here keeps its Run
-	// button and its highlighting, so revealing the code gives you the same
-	// thing every other snippet has.
-	var source = document.createElement("div");
+	// The source, folded away. Moving the original block in here keeps its
+	// highlighting — and its Run button, where it has one.
+	const source = document.createElement("div");
 	source.className = "plot-source";
 	source.hidden = true;
 
-	var toggle = document.createElement("button");
+	const toggle = document.createElement("button");
 	toggle.type = "button";
 	toggle.className = "plot-toggle";
 	toggle.title = ngT("Show the code that drew this");
@@ -375,30 +412,44 @@ async function ngDrawPlot(lang, block, btn) {
 	block.parentNode.insertBefore(figure, block);
 	source.appendChild(block); // the code block now lives inside the figure
 
-	var figures;
+	return { figure: figure, stage: stage, source: source, toggle: toggle, note: note };
+}
+
+// Nothing drew, so there is no figure: show the source, since the reason is in
+// it, and leave the caption unnumbered rather than number a hole.
+function ngPlotFailed(parts, message) {
+	parts.figure.classList.add("plot-failed");
+	parts.source.hidden = false;
+	parts.toggle.hidden = true;
+	parts.note.className = "run-meta run-bad";
+	parts.note.textContent = message
+		? ngT("The plot could not be drawn.") + " " + String(message).split("\n").pop()
+		: ngT("That snippet drew no figure.");
+}
+
+// ngDrawPlot runs a marked Python fence and shows what it drew.
+async function ngDrawPlot(lang, block, btn) {
+	const pre = block.querySelector("pre");
+	if (!pre || block.dataset.plotDrawn) return;
+	const code = pre.textContent;
+	const parts = ngPlotFrame(block, ngPlotMeta(code));
+
+	let figures;
 	try {
 		figures = await ngPlotFigures(lang, code, function (s) {
-			note.textContent = ngT(RUN_STATUS[s] || "Drawing…");
+			parts.note.textContent = ngT(RUN_STATUS[s] || "Drawing…");
 		});
 	} catch (err) {
 		figures = { error: String((err && err.message) || err) };
 	}
 
 	if (Array.isArray(figures) && figures.length) {
-		stage.replaceChildren.apply(stage, ngFigureElements(figures));
+		parts.stage.replaceChildren.apply(parts.stage, ngFigureElements(figures));
 		ngRememberPlots();
-		ngNumberPlots(figure.closest("[data-view], article, body") || document);
+		ngNumberPlots(parts.figure.closest("[data-view], article, body") || document);
 		return;
 	}
-	// Nothing drew, so there is no figure — show the source, since the reason
-	// is in it, and drop the caption's numbering rather than number a hole.
-	figure.classList.add("plot-failed");
-	source.hidden = false;
-	toggle.hidden = true;
-	note.className = "run-meta run-bad";
-	note.textContent = figures && figures.error
-		? ngT("The plot could not be drawn.") + " " + String(figures.error).split("\n").pop()
-		: ngT("That snippet drew no figure.");
+	ngPlotFailed(parts, figures && figures.error);
 }
 
 /* ---- numbering, and pointing at a figure ----
